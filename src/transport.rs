@@ -479,6 +479,10 @@ fn stream_json_body(body: Body) -> impl Stream<Item = Result<Bytes>> {
             }
         }
 
+        if chunk.is_empty() {
+            return None;
+        }
+
         Some((Ok(Bytes::from(chunk)), body))
     }
 
