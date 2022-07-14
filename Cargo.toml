@@ -1,14 +1,14 @@
 [package]
-name = "containers-api-conn"
+name = "containers-api"
 version = "0.1.3"
 edition = "2021"
 
 authors = ["Wojciech Kępka <wojciech@wkepka.dev>"]
-description = "Base connection interface used in podman-api and docker-api crates."
+description = "Common functionality used in podman-api and docker-api crates."
 license = "MIT"
-documentation = "https://docs.rs/containers-api-conn"
-homepage = "https://github.com/vv9k/containers-api-conn"
-repository = "https://github.com/vv9k/containers-api-conn"
+documentation = "https://docs.rs/containers-api"
+homepage = "https://github.com/vv9k/containers-api"
+repository = "https://github.com/vv9k/containers-api"
 keywords = ["podman", "api", "containers", "docker", "unix"]
 
 [dependencies]
