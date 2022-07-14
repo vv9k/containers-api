@@ -3,6 +3,7 @@ pub use url;
 use std::{borrow::Borrow, string::ToString};
 use url::form_urlencoded;
 
+/// Creates an endpoint with a query
 pub fn construct_ep<E, Q>(ep: E, query: Option<Q>) -> String
 where
     E: Into<String>,
@@ -15,6 +16,7 @@ where
     ep
 }
 
+/// Appends a query to an endpoint
 pub fn append_query<Q>(ep: &mut String, query: Q)
 where
     Q: AsRef<str>,
@@ -23,6 +25,7 @@ where
     ep.push_str(query.as_ref());
 }
 
+/// Encodes `key` and `val` as urlencoded values.
 pub fn encoded_pair<K, V>(key: K, val: V) -> String
 where
     K: AsRef<str> + 'static,
@@ -33,6 +36,7 @@ where
         .finish()
 }
 
+/// Encodes an iterator of key:value pairs as urlencoded values.
 pub fn encoded_pairs<I, K, V>(iter: I) -> String
 where
     I: IntoIterator,
