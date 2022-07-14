@@ -1,6 +1,6 @@
 //! Transports for communicating with the Podman or Docker daemon
 
-use crate::{Error, Result};
+use crate::conn::{Error, Result};
 
 use futures_util::{
     io::{AsyncRead, AsyncWrite},

@@ -1,6 +1,6 @@
 //! Types for working with TTY streams
 
-use crate::{Error, Result};
+use crate::conn::{Error, Result};
 use futures_util::{
     io::{AsyncRead, AsyncReadExt, AsyncWrite},
     stream::{Stream, TryStreamExt},

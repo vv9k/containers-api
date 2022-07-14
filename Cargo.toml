@@ -27,11 +27,16 @@ hyper = { version="0.14", features=["client", "http1", "tcp", "stream"] }
 hyper-openssl = { version="0.9", optional=true }
 openssl = { version="0.10", optional=true }
 
+chrono = { version="0.4", optional=true, features=["serde"] }
+
+tar = "0.4"
+flate2 = "1"
+
 [target.'cfg(unix)'.dependencies]
 hyperlocal = { version="0.8" }
 
 [features]
-default = []
+default = ["chrono"]
 tls = ["openssl", "hyper-openssl"]
 vendored-ssl = ["tls", "openssl/vendored"]
 
