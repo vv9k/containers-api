@@ -220,6 +220,7 @@ macro_rules! impl_filter_func {
     };
 }
 
+#[allow(clippy::crate_in_macro_def)]
 #[macro_export]
 /// Initialize a `Opts` struct with a `OptsBuilder` struct to construct it.
 macro_rules! impl_opts_builder {
@@ -288,6 +289,7 @@ macro_rules! impl_opts_builder {
     };
 }
 
+#[allow(clippy::crate_in_macro_def)]
 #[macro_export]
 /// Initialize a `Opts` struct with a required parameter and `OptsBuilder` struct to construct it.
 macro_rules! impl_opts_required_builder {
