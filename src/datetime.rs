@@ -1,3 +1,5 @@
+//! Utility functions to handle dates and time.
+
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
 

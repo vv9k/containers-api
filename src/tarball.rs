@@ -1,3 +1,5 @@
+//! Utility functions to compression.
+
 use flate2::{write::GzEncoder, Compression};
 use std::{
     fs::{self, File},

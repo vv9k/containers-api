@@ -1,3 +1,4 @@
+//! Connection related items
 pub mod transport;
 pub mod tty;
 

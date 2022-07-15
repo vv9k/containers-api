@@ -1,3 +1,5 @@
+//! Utility functions to handle URL manipulation.
+
 pub use url;
 
 use std::{borrow::Borrow, string::ToString};
