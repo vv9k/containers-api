@@ -10,6 +10,12 @@ impl From<String> for Id {
     }
 }
 
+impl From<&String> for Id {
+    fn from(s: &String) -> Self {
+        Self(s.clone())
+    }
+}
+
 impl From<&str> for Id {
     fn from(s: &str) -> Self {
         Self(s.to_string())
