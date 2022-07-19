@@ -4,6 +4,7 @@ pub mod datetime;
 pub mod id;
 pub mod tarball;
 pub mod url;
+pub mod version;
 
 #[macro_use]
 pub mod opts;
