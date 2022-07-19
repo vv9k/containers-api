@@ -2,14 +2,13 @@
 name = "containers-api"
 version = "0.2.0"
 edition = "2021"
-
 authors = ["Wojciech Kępka <wojciech@wkepka.dev>"]
 description = "Common functionality used in podman-api and docker-api crates."
 license = "MIT"
 documentation = "https://docs.rs/containers-api"
 homepage = "https://github.com/vv9k/containers-api"
 repository = "https://github.com/vv9k/containers-api"
-keywords = ["podman", "api", "containers", "docker", "unix"]
+keywords = ["docker", "podman"]
 
 [dependencies]
 log = "0.4"
