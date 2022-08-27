@@ -1,7 +1,42 @@
 /// Types that implement Filter can be used in filter queries.
 pub trait Filter {
-    // TODO: Add a stronger return type. Not all filters are `key=val`, soma are only `key`
-    fn query_key_val(&self) -> (&'static str, String);
+    fn query_item(&self) -> FilterItem;
+}
+
+pub enum Equality {
+    Equal,
+    NotEqual,
+}
+
+pub struct FilterItem {
+    key: &'static str,
+    value: String,
+    equality: Equality,
+}
+
+impl FilterItem {
+    pub fn new(key: &'static str, value: impl Into<String>, equality: Equality) -> Self {
+        Self {
+            key,
+            value: value.into(),
+            equality,
+        }
+    }
+
+    pub fn key(&self) -> &'static str {
+        self.key
+    }
+}
+
+impl std::fmt::Display for FilterItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let equality_sign = match self.equality {
+            Equality::Equal => "=",
+            Equality::NotEqual => "!=",
+        };
+
+        write!(f, "{}{equality_sign}{}", self.key, self.value)
+    }
 }
 
 #[macro_export]
@@ -208,8 +243,10 @@ macro_rules! impl_filter_func {
         pub fn filter(mut self, filters: impl IntoIterator<Item = $filter_ty>) -> Self
         {
             let mut param = std::collections::HashMap::new();
-            for (key, val) in filters.into_iter().map(|f| f.query_key_val()) {
-                param.insert(key, vec![val]);
+            for filter_item in filters.into_iter().map(|f| f.query_item()) {
+                let key = filter_item.key();
+                let mut entry_vec = param.entry(key).or_insert(Vec::new());
+                entry_vec.push(filter_item.to_string());
             }
             // structure is a a json encoded object mapping string keys to a list
             // of string values
