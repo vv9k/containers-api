@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Serialize, Deserialize)]
 /// Represents unique identifier given to an object upon creation.
 pub struct Id(String);
 
