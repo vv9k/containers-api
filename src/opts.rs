@@ -230,10 +230,10 @@ macro_rules! impl_filter_func {
         )*
         pub fn filter(mut self, filters: impl IntoIterator<Item = $filter_ty>) -> Self
         {
-            let mut param = std::collections::HashMap::new();
+            let mut param = std::collections::BTreeMap::new();
             for filter_item in filters.into_iter().map(|f| f.query_item()) {
                 let key = filter_item.key();
-                let mut entry_vec = param.entry(key).or_insert(Vec::new());
+                let entry_vec = param.entry(key).or_insert(Vec::new());
                 entry_vec.push(filter_item.to_string());
             }
             // structure is a a json encoded object mapping string keys to a list
@@ -256,7 +256,7 @@ macro_rules! impl_opts_builder {
             )*
             #[derive(serde::Serialize, Debug, Default, Clone)]
             pub struct [< $name Opts >] {
-                params: std::collections::HashMap<&'static str, $ty>,
+                params: std::collections::BTreeMap<&'static str, $ty>,
             }
             impl [< $name Opts >] {
                 #[doc = concat!("Returns a new instance of a builder for ", stringify!($name), "Opts.")]
@@ -268,7 +268,7 @@ macro_rules! impl_opts_builder {
             #[doc = concat!("A builder struct for ", stringify!($name), "Opts.")]
             #[derive(Default, Debug, Clone)]
             pub struct [< $name OptsBuilder >] {
-                params: std::collections::HashMap<&'static str, $ty>,
+                params: std::collections::BTreeMap<&'static str, $ty>,
             }
 
             impl [< $name OptsBuilder >] {
@@ -325,7 +325,7 @@ macro_rules! impl_opts_required_builder {
             )*
             #[derive(serde::Serialize, Debug, Default, Clone)]
             pub struct [< $name Opts >] {
-                params: std::collections::HashMap<&'static str, $ty>,
+                params: std::collections::BTreeMap<&'static str, $ty>,
             }
             impl [< $name Opts >] {
                 #[doc = concat!("Returns a new instance of a builder for ", stringify!($name), "Opts.")]
@@ -344,7 +344,7 @@ macro_rules! impl_opts_required_builder {
             #[doc = concat!("A builder struct for ", stringify!($name), "Opts.")]
             #[derive(Debug, Clone)]
             pub struct [< $name OptsBuilder >] {
-                params: std::collections::HashMap<&'static str, $ty>,
+                params: std::collections::BTreeMap<&'static str, $ty>,
             }
 
             impl [< $name OptsBuilder >] {
