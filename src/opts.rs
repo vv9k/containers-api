@@ -3,23 +3,16 @@ pub trait Filter {
     fn query_item(&self) -> FilterItem;
 }
 
-pub enum Equality {
-    Equal,
-    NotEqual,
-}
-
 pub struct FilterItem {
     key: &'static str,
     value: String,
-    equality: Equality,
 }
 
 impl FilterItem {
-    pub fn new(key: &'static str, value: impl Into<String>, equality: Equality) -> Self {
+    pub fn new(key: &'static str, value: impl Into<String>) -> Self {
         Self {
             key,
             value: value.into(),
-            equality,
         }
     }
 
@@ -30,12 +23,7 @@ impl FilterItem {
 
 impl std::fmt::Display for FilterItem {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let equality_sign = match self.equality {
-            Equality::Equal => "=",
-            Equality::NotEqual => "!=",
-        };
-
-        write!(f, "{}{equality_sign}{}", self.key, self.value)
+        write!(f, "{}", self.value)
     }
 }
 
