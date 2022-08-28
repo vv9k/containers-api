@@ -399,3 +399,48 @@ macro_rules! impl_opts_required_builder {
         }
     };
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn url_filter_query() {
+        pub enum ListFilter {
+            Id(crate::id::Id),
+            LabelKey(String),
+            LabelKeyVal(String, String),
+        }
+
+        impl Filter for ListFilter {
+            fn query_item(&self) -> FilterItem {
+                use ListFilter::*;
+                match &self {
+                    Id(id) => FilterItem::new("id", id.to_string()),
+                    LabelKey(key) => FilterItem::new("label", key.clone()),
+                    LabelKeyVal(key, val) => FilterItem::new("label", format!("{}={}", key, val)),
+                }
+            }
+        }
+
+        impl_opts_builder! (url =>
+            UrlTest
+        );
+
+        impl UrlTestOptsBuilder {
+            impl_filter_func!(ListFilter);
+        }
+
+        let opts = UrlTestOpts::builder()
+            .filter([
+                ListFilter::Id("testid".into()),
+                ListFilter::LabelKey("test1".into()),
+                ListFilter::LabelKeyVal("test2".into(), "key".into()),
+            ])
+            .build();
+
+        let want = Some("filters=%7B%22id%22%3A%5B%22testid%22%5D%2C%22label%22%3A%5B%22test1%22%2C%22test2%3Dkey%22%5D%7D".into());
+        let got = opts.serialize();
+        assert_eq!(got, want);
+    }
+}
