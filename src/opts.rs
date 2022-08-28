@@ -305,7 +305,7 @@ macro_rules! impl_opts_builder {
                         None
                     } else {
                         Some(
-                            containers_api::url::encoded_pairs(&self.params)
+                            $crate::url::encoded_pairs(&self.params)
                         )
                     }
                 }
@@ -391,7 +391,7 @@ macro_rules! impl_opts_required_builder {
                         None
                     } else {
                         Some(
-                            containers_api::url::encoded_pairs(&self.params)
+                            $crate::url::encoded_pairs(&self.params)
                         )
                     }
                 }
