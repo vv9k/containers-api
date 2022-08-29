@@ -30,12 +30,30 @@ where
 /// Encodes `key` and `val` as urlencoded values.
 pub fn encoded_pair<K, V>(key: K, val: V) -> String
 where
-    K: AsRef<str> + 'static,
+    K: AsRef<str>,
     V: ToString,
 {
     form_urlencoded::Serializer::new(String::new())
         .append_pair(key.as_ref(), &val.to_string())
         .finish()
+}
+
+/// Encodes multiple values for the same key
+pub fn encoded_vec_pairs<K, I>(pairs: impl IntoIterator<Item = (K, I)>) -> String
+where
+    K: AsRef<str>,
+    I: IntoIterator,
+    I::Item: AsRef<str>,
+{
+    let mut serializer = form_urlencoded::Serializer::new(String::new());
+    pairs.into_iter().for_each(|(key, vals)| {
+        let key = key.as_ref();
+        vals.into_iter().for_each(|val| {
+            serializer.append_pair(key, val.as_ref());
+        });
+    });
+
+    serializer.finish()
 }
 
 /// Encodes an iterator of key:value pairs as urlencoded values.
