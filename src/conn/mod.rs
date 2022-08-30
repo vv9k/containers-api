@@ -10,6 +10,7 @@ pub use hyper;
 
 use hyper::client::HttpConnector;
 use hyper::StatusCode;
+use serde_json::Error as SerdeError;
 use thiserror::Error as ThisError;
 
 #[cfg(feature = "tls")]
@@ -26,6 +27,8 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[derive(Debug, ThisError)]
 /// All error variants that can happen during communication.
 pub enum Error {
+    #[error(transparent)]
+    SerdeJsonError(#[from] SerdeError),
     #[error("The HTTP connection was not upgraded by the podman host")]
     ConnectionNotUpgraded,
     #[error(transparent)]
