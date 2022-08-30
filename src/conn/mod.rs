@@ -1,7 +1,9 @@
 //! Connection related items
+pub mod client;
 pub mod transport;
 pub mod tty;
 
+pub use client::*;
 pub use transport::*;
 pub use tty::*;
 
