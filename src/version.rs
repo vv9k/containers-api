@@ -24,6 +24,18 @@ impl ApiVersion {
         }
     }
 
+    pub fn major(&self) -> usize {
+        self.major
+    }
+
+    pub fn minor(&self) -> usize {
+        self.minor
+    }
+
+    pub fn patch(&self) -> usize {
+        self.patch
+    }
+
     pub fn make_endpoint(&self, ep: impl AsRef<str>) -> String {
         let ep = ep.as_ref();
         format!(
