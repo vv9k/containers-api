@@ -425,6 +425,7 @@ macro_rules! impl_opts_required_builder {
             pub struct [< $name Opts >] {
                 params: std::collections::BTreeMap<&'static str, $ty>,
                 vec_params: std::collections::BTreeMap<&'static str, Vec<$ty>>,
+                [< $param >]: $ty,
             }
             impl [< $name Opts >] {
                 #[doc = concat!("Returns a new instance of a builder for ", stringify!($name), "Opts.")]
@@ -438,6 +439,10 @@ macro_rules! impl_opts_required_builder {
                 pub fn get_param(&self, key: &str) -> Option<&$ty> {
                     self.params.get(key)
                 }
+
+                pub fn [< $param >](&self) -> &$ty {
+                    &self.$param
+                }
             }
 
             #[doc = concat!("A builder struct for ", stringify!($name), "Opts.")]
@@ -445,6 +450,7 @@ macro_rules! impl_opts_required_builder {
             pub struct [< $name OptsBuilder >] {
                 params: std::collections::BTreeMap<&'static str, $ty>,
                 vec_params: std::collections::BTreeMap<&'static str, Vec<$ty>>,
+                [< $param >]: $ty,
             }
 
             impl [< $name OptsBuilder >] {
@@ -453,9 +459,11 @@ macro_rules! impl_opts_required_builder {
                     #[doc= $param_docs]
                 )*
                 pub fn new($param: impl Into<$ty>) -> Self {
+                    let param = $param.into();
                     Self {
-                        params: [($param_key, $param.into())].into(),
-                        vec_params: Default::default()
+                        params: [($param_key, param.clone())].into(),
+                        vec_params: Default::default(),
+                        [< $param >]: param,
                     }
                 }
 
@@ -463,7 +471,8 @@ macro_rules! impl_opts_required_builder {
                 pub fn build(self) -> [< $name Opts >] {
                     [< $name Opts >] {
                         params: self.params,
-                        vec_params: self.vec_params
+                        vec_params: self.vec_params,
+                        [< $param >]: self.$param,
                     }
                 }
             }
