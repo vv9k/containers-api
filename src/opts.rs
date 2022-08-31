@@ -27,6 +27,12 @@ impl std::fmt::Display for FilterItem {
     }
 }
 
+impl From<(&'static str, String)> for FilterItem {
+    fn from(it: (&'static str, String)) -> Self {
+        Self::new(it.0, it.1)
+    }
+}
+
 #[macro_export]
 /// Implements methods to set a parameter of a specified type serialized as JSON.
 macro_rules! impl_field {
