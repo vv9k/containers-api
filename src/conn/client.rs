@@ -21,6 +21,8 @@ pub struct RequestClient<E> {
 pub type ValidateResponseFn<E> = fn(Response<Body>) -> Result<Response<Body>, E>;
 
 impl<E: From<conn::Error> + From<serde_json::Error>> RequestClient<E> {
+    /// Creates a new RequestClient with a specified transport and a function to validate
+    /// each response.
     pub fn new(transport: Transport, validate_fn: Box<ValidateResponseFn<E>>) -> Self {
         Self {
             transport,
@@ -85,10 +87,10 @@ impl<E: From<conn::Error> + From<serde_json::Error>> RequestClient<E> {
     }
 
     /// Make a GET request to the `endpoint` and return a stream of byte chunks.
-    pub fn get_stream<'a>(
-        &'a self,
-        endpoint: impl AsRef<str> + 'a,
-    ) -> impl Stream<Item = Result<Bytes, E>> + 'a {
+    pub fn get_stream<'client>(
+        &'client self,
+        endpoint: impl AsRef<str> + 'client,
+    ) -> impl Stream<Item = Result<Bytes, E>> + 'client {
         self.get_stream_impl(endpoint).try_flatten_stream()
     }
 
@@ -185,14 +187,14 @@ impl<E: From<conn::Error> + From<serde_json::Error>> RequestClient<E> {
     ///
     /// Use [`post_into_stream`](RequestClient::post_into_stream) if the endpoint
     /// returns JSON values.
-    pub fn post_stream<'transport, B>(
-        &'transport self,
-        endpoint: impl AsRef<str> + 'transport,
+    pub fn post_stream<'client, B>(
+        &'client self,
+        endpoint: impl AsRef<str> + 'client,
         body: Payload<B>,
         headers: Option<Headers>,
-    ) -> impl Stream<Item = Result<Bytes, E>> + 'transport
+    ) -> impl Stream<Item = Result<Bytes, E>> + 'client
     where
-        B: Into<Body> + 'transport,
+        B: Into<Body> + 'client,
     {
         self.post_stream_impl(endpoint, body, headers)
             .try_flatten_stream()
@@ -212,14 +214,14 @@ impl<E: From<conn::Error> + From<serde_json::Error>> RequestClient<E> {
     }
 
     /// Send a streaming post request.
-    fn post_json_stream<'transport, B>(
-        &'transport self,
-        endpoint: impl AsRef<str> + 'transport,
+    fn post_json_stream<'client, B>(
+        &'client self,
+        endpoint: impl AsRef<str> + 'client,
         body: Payload<B>,
         headers: Option<Headers>,
-    ) -> impl Stream<Item = Result<Bytes, E>> + 'transport
+    ) -> impl Stream<Item = Result<Bytes, E>> + 'client
     where
-        B: Into<Body> + 'transport,
+        B: Into<Body> + 'client,
     {
         self.post_json_stream_impl(endpoint, body, headers)
             .try_flatten_stream()

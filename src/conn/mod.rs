@@ -1,11 +1,18 @@
 //! Connection related items
 pub mod client;
+mod compat;
+mod headers;
+mod payload;
 pub mod transport;
 pub mod tty;
 
 pub use client::*;
+pub use headers::Headers;
+pub use payload::Payload;
 pub use transport::*;
 pub use tty::*;
+
+pub(crate) use compat::Compat;
 
 pub use http;
 pub use hyper;

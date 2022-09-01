@@ -1,9 +1,8 @@
 //! Transports for communicating with the Podman or Docker daemon
 
-use crate::conn::{Error, Result};
+use crate::conn::{Error, Headers, Payload, Result};
 
 use futures_util::{
-    io::{AsyncRead, AsyncWrite},
     stream::{self, Stream},
     StreamExt,
 };
@@ -18,107 +17,9 @@ use hyper_openssl::HttpsConnector;
 use hyperlocal::UnixConnector;
 #[cfg(unix)]
 use hyperlocal::Uri as DomainUri;
-use pin_project::pin_project;
-
-use serde::{Deserialize, Serialize};
 use url::Url;
 
-use std::{
-    io,
-    iter::IntoIterator,
-    path::PathBuf,
-    pin::Pin,
-    task::{Context, Poll},
-};
-
-#[derive(Debug, Default, Clone)]
-/// Helper structure used as a container for HTTP headers passed to a request
-pub struct Headers(Vec<(&'static str, String)>);
-
-impl Headers {
-    /// Shortcut for when one does not want headers in a request
-    pub fn none() -> Option<Headers> {
-        None
-    }
-
-    /// Adds a single key=value header pair
-    pub fn add<V>(&mut self, key: &'static str, val: V)
-    where
-        V: Into<String>,
-    {
-        self.0.push((key, val.into()))
-    }
-
-    /// Constructs an instance of Headers with initial pair, usually used when there is only
-    /// a need for one header.
-    pub fn single<V>(key: &'static str, val: V) -> Self
-    where
-        V: Into<String>,
-    {
-        let mut h = Self::default();
-        h.add(key, val);
-        h
-    }
-}
-
-impl IntoIterator for Headers {
-    type Item = (&'static str, String);
-    type IntoIter = std::vec::IntoIter<Self::Item>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
-    }
-}
-
-/// Types of payload that can be sent
-pub enum Payload<B: Into<Body>> {
-    None,
-    Text(B),
-    Json(B),
-    XTar(B),
-    Tar(B),
-}
-
-impl Payload<Body> {
-    /// Creates an empty payload
-    pub fn empty() -> Self {
-        Payload::None
-    }
-}
-
-impl<B: Into<Body>> Payload<B> {
-    /// Extracts the inner body if there is one and returns it
-    pub fn into_inner(self) -> Option<B> {
-        match self {
-            Self::None => None,
-            Self::Text(b) => Some(b),
-            Self::Json(b) => Some(b),
-            Self::XTar(b) => Some(b),
-            Self::Tar(b) => Some(b),
-        }
-    }
-
-    /// Returns the mime type of this payload
-    pub fn mime_type(&self) -> Option<mime::Mime> {
-        match &self {
-            Self::None => None,
-            Self::Text(_) => None,
-            Self::Json(_) => Some(mime::APPLICATION_JSON),
-            Self::XTar(_) => Some("application/x-tar".parse().expect("parsed mime")),
-            Self::Tar(_) => Some("application/tar".parse().expect("parsed mime")),
-        }
-    }
-
-    /// Checks if there is no payload
-    pub fn is_none(&self) -> bool {
-        matches!(self, Self::None)
-    }
-}
-
-pub async fn body_to_string(body: Body) -> Result<String> {
-    let bytes = hyper::body::to_bytes(body).await?;
-    String::from_utf8(bytes.to_vec()).map_err(Error::from)
-}
+use std::{iter::IntoIterator, path::PathBuf};
 
 /// Transports are types which define supported means of communication.
 #[derive(Clone, Debug)]
@@ -192,6 +93,11 @@ impl Transport {
     }
 }
 
+pub(crate) async fn body_to_string(body: Body) -> Result<String> {
+    let bytes = hyper::body::to_bytes(body).await?;
+    String::from_utf8(bytes.to_vec()).map_err(Error::from)
+}
+
 /// Builds an HTTP request.
 pub(crate) fn build_request<B>(
     method: Method,
@@ -227,62 +133,8 @@ where
         .map_err(Error::from)
 }
 
-pub async fn get_response_string(response: Response<Body>) -> Result<String> {
+pub(crate) async fn get_response_string(response: Response<Body>) -> Result<String> {
     body_to_string(response.into_body()).await
-}
-
-#[pin_project]
-pub struct Compat<S> {
-    #[pin]
-    tokio_multiplexer: S,
-}
-
-impl<S> Compat<S> {
-    pub fn new(tokio_multiplexer: S) -> Self {
-        Self { tokio_multiplexer }
-    }
-}
-
-impl<S> AsyncRead for Compat<S>
-where
-    S: tokio::io::AsyncRead,
-{
-    fn poll_read(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut [u8],
-    ) -> Poll<io::Result<usize>> {
-        let mut readbuf = tokio::io::ReadBuf::new(buf);
-        match self.project().tokio_multiplexer.poll_read(cx, &mut readbuf) {
-            Poll::Pending => Poll::Pending,
-            Poll::Ready(Ok(())) => Poll::Ready(Ok(readbuf.filled().len())),
-            Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
-        }
-    }
-}
-
-impl<S> AsyncWrite for Compat<S>
-where
-    S: tokio::io::AsyncWrite,
-{
-    fn poll_write(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<io::Result<usize>> {
-        self.project().tokio_multiplexer.poll_write(cx, buf)
-    }
-    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        self.project().tokio_multiplexer.poll_flush(cx)
-    }
-    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        self.project().tokio_multiplexer.poll_shutdown(cx)
-    }
-}
-
-#[derive(Serialize, Deserialize)]
-struct ErrorResponse {
-    message: String,
 }
 
 pub(crate) fn stream_response(response: Response<Body>) -> impl Stream<Item = Result<Bytes>> {
