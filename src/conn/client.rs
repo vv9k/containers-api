@@ -68,10 +68,10 @@ impl<E: From<conn::Error> + From<serde_json::Error>> RequestClient<E> {
     }
 
     /// Make a GET request to the `endpoint` and return a stream of byte chunks.
-    pub fn get_stream<'client>(
-        &'client self,
+    pub fn get_stream(
+        &self,
         endpoint: impl AsRef<str>,
-    ) -> impl Stream<Item = Result<Bytes, E>> + 'client {
+    ) -> impl Stream<Item = Result<Bytes, E>> + '_ {
         let req = self.make_request(
             Method::GET,
             endpoint.as_ref(),
@@ -160,12 +160,12 @@ impl<E: From<conn::Error> + From<serde_json::Error>> RequestClient<E> {
     ///
     /// Use [`post_into_stream`](RequestClient::post_into_stream) if the endpoint
     /// returns JSON values.
-    pub fn post_stream<'client, B>(
-        &'client self,
+    pub fn post_stream<B>(
+        &self,
         endpoint: impl AsRef<str>,
         body: Payload<B>,
         headers: Option<Headers>,
-    ) -> impl Stream<Item = Result<Bytes, E>> + 'client
+    ) -> impl Stream<Item = Result<Bytes, E>> + '_
     where
         B: Into<Body>,
     {
@@ -174,12 +174,12 @@ impl<E: From<conn::Error> + From<serde_json::Error>> RequestClient<E> {
     }
 
     /// Send a streaming post request.
-    fn post_json_stream<'client, B>(
-        &'client self,
+    fn post_json_stream<B>(
+        &self,
         endpoint: impl AsRef<str>,
         body: Payload<B>,
         headers: Option<Headers>,
-    ) -> impl Stream<Item = Result<Bytes, E>> + 'client
+    ) -> impl Stream<Item = Result<Bytes, E>> + '_
     where
         B: Into<Body>,
     {

@@ -177,17 +177,17 @@ impl Transport {
         body_to_string(body).await
     }
 
-    pub fn stream_chunks<'transport>(
-        &'transport self,
+    pub fn stream_chunks(
+        &self,
         req: Result<Request<Body>>,
-    ) -> impl Stream<Item = Result<Bytes>> + 'transport {
+    ) -> impl Stream<Item = Result<Bytes>> + '_ {
         self.get_chunk_stream(req).try_flatten_stream()
     }
 
-    pub fn stream_json_chunks<'transport>(
-        &'transport self,
+    pub fn stream_json_chunks(
+        &self,
         req: Result<Request<Body>>,
-    ) -> impl Stream<Item = Result<Bytes>> + 'transport {
+    ) -> impl Stream<Item = Result<Bytes>> + '_ {
         self.get_json_chunk_stream(req).try_flatten_stream()
     }
 
