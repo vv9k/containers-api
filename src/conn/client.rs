@@ -1,8 +1,14 @@
-use crate::conn::{self, build_request, Headers, Payload, Transport};
+use crate::conn::{
+    self, build_request, get_response_string, stream_json_response, stream_response, Headers,
+    Payload, Transport,
+};
+use futures;
 use futures_util::{
+    future,
     io::{AsyncRead, AsyncWrite},
+    stream,
     stream::Stream,
-    TryStreamExt,
+    FutureExt, TryStreamExt,
 };
 use hyper::{body::Bytes, Body, Method, Request, Response};
 use log::trace;
@@ -11,13 +17,17 @@ use serde::de::DeserializeOwned;
 #[derive(Debug, Clone)]
 pub struct RequestClient<E> {
     transport: Transport,
+    validate_fn: Box<ValidateResponseFn<E>>,
     _error_type: std::marker::PhantomData<E>,
 }
 
+pub type ValidateResponseFn<E> = fn(Response<Body>) -> Result<Response<Body>, E>;
+
 impl<E: From<conn::Error> + From<serde_json::Error>> RequestClient<E> {
-    pub fn new(transport: Transport) -> Self {
+    pub fn new(transport: Transport, validate_fn: Box<ValidateResponseFn<E>>) -> Self {
         Self {
             transport,
+            validate_fn,
             _error_type: std::marker::PhantomData,
         }
     }
@@ -48,16 +58,17 @@ impl<E: From<conn::Error> + From<serde_json::Error>> RequestClient<E> {
             Payload::empty(),
             Headers::none(),
         );
-        self.transport.request(req).await.map_err(E::from)
+        self.transport
+            .request(req)
+            .await
+            .map_err(E::from)
+            .and_then(|resp| (&self.validate_fn)(resp))
     }
 
     /// Make a GET request to the `endpoint` and return the response as a string.
     pub async fn get_string(&self, endpoint: impl AsRef<str>) -> Result<String, E> {
         let response = self.get(endpoint).await?;
-        self.transport
-            .get_response_string(response)
-            .await
-            .map_err(E::from)
+        get_response_string(response).await.map_err(E::from)
     }
 
     /// Make a GET request to the `endpoint` and return the response as a JSON deserialized object.
@@ -72,13 +83,11 @@ impl<E: From<conn::Error> + From<serde_json::Error>> RequestClient<E> {
         &self,
         endpoint: impl AsRef<str>,
     ) -> impl Stream<Item = Result<Bytes, E>> + '_ {
-        let req = self.make_request(
-            Method::GET,
-            endpoint.as_ref(),
-            Payload::empty(),
-            Headers::none(),
-        );
-        self.transport.stream_chunks(req).map_err(E::from)
+        async {
+            let response = self.get(endpoint).await?;
+            stream_response(response)
+        }
+        .flatten()
     }
 
     /// Make a GET request to the `endpoint` and return a stream of JSON chunk results.
@@ -118,7 +127,11 @@ impl<E: From<conn::Error> + From<serde_json::Error>> RequestClient<E> {
         B: Into<Body>,
     {
         let req = self.make_request(Method::POST, endpoint.as_ref(), body, headers);
-        self.transport.request(req).await.map_err(E::from)
+        self.transport
+            .request(req)
+            .await
+            .map_err(E::from)
+            .and_then(|resp| (&self.validate_fn)(resp))
     }
 
     /// Make a POST request to the `endpoint` and return the response as a string.
@@ -132,10 +145,7 @@ impl<E: From<conn::Error> + From<serde_json::Error>> RequestClient<E> {
         B: Into<Body>,
     {
         let response = self.post(endpoint, body, headers).await?;
-        self.transport
-            .get_response_string(response)
-            .await
-            .map_err(E::from)
+        get_response_string(response).await.map_err(E::from)
     }
 
     /// Make a POST request to the `endpoint` and return the response as a JSON
@@ -242,7 +252,11 @@ impl<E: From<conn::Error> + From<serde_json::Error>> RequestClient<E> {
         B: Into<Body>,
     {
         let req = self.make_request(Method::PUT, endpoint.as_ref(), body, Headers::none());
-        self.transport.request(req).await.map_err(E::from)
+        self.transport
+            .request(req)
+            .await
+            .map_err(E::from)
+            .and_then(|resp| (&self.validate_fn)(resp))
     }
 
     /// Make a PUT request to the `endpoint` and return the response as a string.
@@ -255,10 +269,7 @@ impl<E: From<conn::Error> + From<serde_json::Error>> RequestClient<E> {
         B: Into<Body>,
     {
         let response = self.put(endpoint, body).await?;
-        self.transport
-            .get_response_string(response)
-            .await
-            .map_err(E::from)
+        get_response_string(response).await.map_err(E::from)
     }
 
     //####################################################################################################
@@ -273,16 +284,17 @@ impl<E: From<conn::Error> + From<serde_json::Error>> RequestClient<E> {
             Payload::empty(),
             Headers::none(),
         );
-        self.transport.request(req).await.map_err(E::from)
+        self.transport
+            .request(req)
+            .await
+            .map_err(E::from)
+            .and_then(|resp| (&self.validate_fn)(resp))
     }
 
     /// Make a DELETE request to the `endpoint` and return the response as a string.
     pub async fn delete_string(&self, endpoint: impl AsRef<str>) -> Result<String, E> {
         let response = self.delete(endpoint).await?;
-        self.transport
-            .get_response_string(response)
-            .await
-            .map_err(E::from)
+        get_response_string(response).await.map_err(E::from)
     }
 
     /// Make a DELETE request to the `endpoint` and return the response as a JSON
@@ -308,6 +320,10 @@ impl<E: From<conn::Error> + From<serde_json::Error>> RequestClient<E> {
             Payload::empty(),
             Headers::none(),
         );
-        self.transport.request(req).await.map_err(E::from)
+        self.transport
+            .request(req)
+            .await
+            .map_err(E::from)
+            .and_then(|resp| (&self.validate_fn)(resp))
     }
 }

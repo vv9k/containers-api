@@ -177,20 +177,6 @@ impl Transport {
         body_to_string(body).await
     }
 
-    pub fn stream_chunks(
-        &self,
-        req: Result<Request<Body>>,
-    ) -> impl Stream<Item = Result<Bytes>> + '_ {
-        self.get_chunk_stream(req).try_flatten_stream()
-    }
-
-    pub fn stream_json_chunks(
-        &self,
-        req: Result<Request<Body>>,
-    ) -> impl Stream<Item = Result<Bytes>> + '_ {
-        self.get_json_chunk_stream(req).try_flatten_stream()
-    }
-
     pub async fn stream_upgrade<B>(
         &self,
         method: Method,
@@ -207,60 +193,7 @@ impl Transport {
     }
 
     pub async fn get_body_request(&self, req: Result<Request<Body>>) -> Result<Body> {
-        let response = self.request(req).await?;
-        self.get_body_response(response).await
-    }
-
-    pub async fn get_body_response(&self, response: Response<Body>) -> Result<Body> {
-        log::trace!(
-            "got response {} {:?}",
-            response.status(),
-            response.headers()
-        );
-        let status = response.status();
-        let body = response.into_body();
-
-        match status {
-            // Success case: pass on the response
-            StatusCode::OK
-            | StatusCode::CREATED
-            | StatusCode::SWITCHING_PROTOCOLS
-            | StatusCode::NO_CONTENT => Ok(body),
-            _ => {
-                let bytes = hyper::body::to_bytes(body).await?;
-                let message_body = String::from_utf8(bytes.to_vec())?;
-
-                log::trace!("{message_body:#?}");
-                Err(Error::Fault {
-                    code: status,
-                    message: Self::get_error_message(&message_body).unwrap_or_else(|| {
-                        status
-                            .canonical_reason()
-                            .unwrap_or("unknown error code")
-                            .to_owned()
-                    }),
-                })
-            }
-        }
-    }
-
-    pub async fn get_response_string(&self, response: Response<Body>) -> Result<String> {
-        let body = self.get_body_response(response).await?;
-        body_to_string(body).await
-    }
-
-    async fn get_chunk_stream(
-        &self,
-        req: Result<Request<Body>>,
-    ) -> Result<impl Stream<Item = Result<Bytes>>> {
-        self.get_body_request(req).await.map(stream_body)
-    }
-
-    async fn get_json_chunk_stream(
-        &self,
-        req: Result<Request<Body>>,
-    ) -> Result<impl Stream<Item = Result<Bytes>>> {
-        self.get_body_request(req).await.map(stream_json_body)
+        self.request(req).await.map(|resp| resp.into_body())
     }
 
     /// Send the given request and return a Future of the response.
@@ -301,13 +234,6 @@ impl Transport {
             _ => Err(Error::ConnectionNotUpgraded),
         }
     }
-
-    /// Extract the error message content from an HTTP response
-    fn get_error_message(body: &str) -> Option<String> {
-        serde_json::from_str::<ErrorResponse>(body)
-            .map(|e| e.message)
-            .ok()
-    }
 }
 
 /// Builds an HTTP request.
@@ -343,6 +269,10 @@ where
     // it's ok to unwrap, we check that the body is not none
     req.body(body.into_inner().unwrap().into())
         .map_err(Error::from)
+}
+
+pub async fn get_response_string(response: Response<Body>) -> Result<String> {
+    body_to_string(response.into_body()).await
 }
 
 #[pin_project]
@@ -397,6 +327,14 @@ where
 #[derive(Serialize, Deserialize)]
 struct ErrorResponse {
     message: String,
+}
+
+pub(crate) fn stream_response(response: Response<Body>) -> impl Stream<Item = Result<Bytes>> {
+    stream_body(response.into_body())
+}
+
+pub(crate) fn stream_json_response(response: Response<Body>) -> impl Stream<Item = Result<Bytes>> {
+    stream_json_body(response.into_body())
 }
 
 fn stream_body(body: Body) -> impl Stream<Item = Result<Bytes>> {
