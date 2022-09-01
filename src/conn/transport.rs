@@ -5,12 +5,12 @@ use crate::conn::{Error, Result};
 use futures_util::{
     io::{AsyncRead, AsyncWrite},
     stream::{self, Stream},
-    StreamExt, TryFutureExt,
+    StreamExt,
 };
 use hyper::{
     body::Bytes,
     client::{Client, HttpConnector},
-    header, Body, Method, Request, Response, StatusCode,
+    header, Body, Method, Request, Response,
 };
 #[cfg(feature = "tls")]
 use hyper_openssl::HttpsConnector;
@@ -173,94 +173,8 @@ impl Transport {
     }
 
     pub async fn request_string(&self, req: Result<Request<Body>>) -> Result<String> {
-        let body = self.get_body_request(req).await?;
+        let body = self.request(req).await.map(|resp| resp.into_body())?;
         body_to_string(body).await
-    }
-
-    pub fn stream_chunks(
-        &self,
-        req: Result<Request<Body>>,
-    ) -> impl Stream<Item = Result<Bytes>> + '_ {
-        self.get_chunk_stream(req).try_flatten_stream()
-    }
-
-    pub fn stream_json_chunks(
-        &self,
-        req: Result<Request<Body>>,
-    ) -> impl Stream<Item = Result<Bytes>> + '_ {
-        self.get_json_chunk_stream(req).try_flatten_stream()
-    }
-
-    pub async fn stream_upgrade<B>(
-        &self,
-        method: Method,
-        endpoint: impl AsRef<str>,
-        body: Payload<B>,
-    ) -> Result<impl AsyncRead + AsyncWrite>
-    where
-        B: Into<Body>,
-    {
-        self.stream_upgrade_tokio(method, endpoint.as_ref(), body)
-            .await
-            .map(Compat::new)
-            .map_err(Error::from)
-    }
-
-    pub async fn get_body_request(&self, req: Result<Request<Body>>) -> Result<Body> {
-        let response = self.request(req).await?;
-        self.get_body_response(response).await
-    }
-
-    pub async fn get_body_response(&self, response: Response<Body>) -> Result<Body> {
-        log::trace!(
-            "got response {} {:?}",
-            response.status(),
-            response.headers()
-        );
-        let status = response.status();
-        let body = response.into_body();
-
-        match status {
-            // Success case: pass on the response
-            StatusCode::OK
-            | StatusCode::CREATED
-            | StatusCode::SWITCHING_PROTOCOLS
-            | StatusCode::NO_CONTENT => Ok(body),
-            _ => {
-                let bytes = hyper::body::to_bytes(body).await?;
-                let message_body = String::from_utf8(bytes.to_vec())?;
-
-                log::trace!("{message_body:#?}");
-                Err(Error::Fault {
-                    code: status,
-                    message: Self::get_error_message(&message_body).unwrap_or_else(|| {
-                        status
-                            .canonical_reason()
-                            .unwrap_or("unknown error code")
-                            .to_owned()
-                    }),
-                })
-            }
-        }
-    }
-
-    pub async fn get_response_string(&self, response: Response<Body>) -> Result<String> {
-        let body = self.get_body_response(response).await?;
-        body_to_string(body).await
-    }
-
-    async fn get_chunk_stream(
-        &self,
-        req: Result<Request<Body>>,
-    ) -> Result<impl Stream<Item = Result<Bytes>>> {
-        self.get_body_request(req).await.map(stream_body)
-    }
-
-    async fn get_json_chunk_stream(
-        &self,
-        req: Result<Request<Body>>,
-    ) -> Result<impl Stream<Item = Result<Bytes>>> {
-        self.get_body_request(req).await.map(stream_json_body)
     }
 
     /// Send the given request and return a Future of the response.
@@ -275,38 +189,6 @@ impl Transport {
         }
         .await
         .map_err(Error::from)
-    }
-
-    /// Makes an HTTP request, upgrading the connection to a TCP
-    /// stream on success.
-    async fn stream_upgrade_tokio<B>(
-        &self,
-        method: Method,
-        endpoint: &str,
-        body: Payload<B>,
-    ) -> Result<hyper::upgrade::Upgraded>
-    where
-        B: Into<Body>,
-    {
-        let mut headers = Headers::default();
-        headers.add(header::CONNECTION.as_str(), "Upgrade");
-        headers.add(header::UPGRADE.as_str(), "tcp");
-
-        let uri = self.make_uri(endpoint)?;
-        let req = build_request(method, uri, body, Some(headers))?;
-
-        let response = self.send_request(req).await?;
-        match response.status() {
-            StatusCode::SWITCHING_PROTOCOLS => Ok(hyper::upgrade::on(response).await?),
-            _ => Err(Error::ConnectionNotUpgraded),
-        }
-    }
-
-    /// Extract the error message content from an HTTP response
-    fn get_error_message(body: &str) -> Option<String> {
-        serde_json::from_str::<ErrorResponse>(body)
-            .map(|e| e.message)
-            .ok()
     }
 }
 
@@ -345,14 +227,18 @@ where
         .map_err(Error::from)
 }
 
+pub async fn get_response_string(response: Response<Body>) -> Result<String> {
+    body_to_string(response.into_body()).await
+}
+
 #[pin_project]
-struct Compat<S> {
+pub struct Compat<S> {
     #[pin]
     tokio_multiplexer: S,
 }
 
 impl<S> Compat<S> {
-    fn new(tokio_multiplexer: S) -> Self {
+    pub fn new(tokio_multiplexer: S) -> Self {
         Self { tokio_multiplexer }
     }
 }
@@ -397,6 +283,14 @@ where
 #[derive(Serialize, Deserialize)]
 struct ErrorResponse {
     message: String,
+}
+
+pub(crate) fn stream_response(response: Response<Body>) -> impl Stream<Item = Result<Bytes>> {
+    stream_body(response.into_body())
+}
+
+pub(crate) fn stream_json_response(response: Response<Body>) -> impl Stream<Item = Result<Bytes>> {
+    stream_json_body(response.into_body())
 }
 
 fn stream_body(body: Body) -> impl Stream<Item = Result<Bytes>> {

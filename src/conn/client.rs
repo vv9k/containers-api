@@ -1,23 +1,30 @@
-use crate::conn::{self, build_request, Headers, Payload, Transport};
+use crate::conn::{
+    self, build_request, get_response_string, stream_json_response, stream_response, Compat,
+    Headers, Payload, Transport,
+};
 use futures_util::{
     io::{AsyncRead, AsyncWrite},
     stream::Stream,
-    TryStreamExt,
+    TryFutureExt, TryStreamExt,
 };
-use hyper::{body::Bytes, Body, Method, Request, Response};
+use hyper::{body::Bytes, header, Body, Method, Request, Response, StatusCode};
 use log::trace;
 use serde::de::DeserializeOwned;
 
 #[derive(Debug, Clone)]
 pub struct RequestClient<E> {
     transport: Transport,
+    validate_fn: Box<ValidateResponseFn<E>>,
     _error_type: std::marker::PhantomData<E>,
 }
 
+pub type ValidateResponseFn<E> = fn(Response<Body>) -> Result<Response<Body>, E>;
+
 impl<E: From<conn::Error> + From<serde_json::Error>> RequestClient<E> {
-    pub fn new(transport: Transport) -> Self {
+    pub fn new(transport: Transport, validate_fn: Box<ValidateResponseFn<E>>) -> Self {
         Self {
             transport,
+            validate_fn,
             _error_type: std::marker::PhantomData,
         }
     }
@@ -48,16 +55,17 @@ impl<E: From<conn::Error> + From<serde_json::Error>> RequestClient<E> {
             Payload::empty(),
             Headers::none(),
         );
-        self.transport.request(req).await.map_err(E::from)
+        self.transport
+            .request(req)
+            .await
+            .map_err(E::from)
+            .and_then(|resp| (&self.validate_fn)(resp))
     }
 
     /// Make a GET request to the `endpoint` and return the response as a string.
     pub async fn get_string(&self, endpoint: impl AsRef<str>) -> Result<String, E> {
         let response = self.get(endpoint).await?;
-        self.transport
-            .get_response_string(response)
-            .await
-            .map_err(E::from)
+        get_response_string(response).await.map_err(E::from)
     }
 
     /// Make a GET request to the `endpoint` and return the response as a JSON deserialized object.
@@ -67,18 +75,21 @@ impl<E: From<conn::Error> + From<serde_json::Error>> RequestClient<E> {
         serde_json::from_str::<T>(&raw_string).map_err(E::from)
     }
 
-    /// Make a GET request to the `endpoint` and return a stream of byte chunks.
-    pub fn get_stream(
+    async fn get_stream_impl(
         &self,
         endpoint: impl AsRef<str>,
-    ) -> impl Stream<Item = Result<Bytes, E>> + '_ {
-        let req = self.make_request(
-            Method::GET,
-            endpoint.as_ref(),
-            Payload::empty(),
-            Headers::none(),
-        );
-        self.transport.stream_chunks(req).map_err(E::from)
+    ) -> Result<impl Stream<Item = Result<Bytes, E>> + '_, E> {
+        let response = self.get(endpoint).await?;
+        let response = (&self.validate_fn)(response)?;
+        Ok(stream_response(response).map_err(E::from))
+    }
+
+    /// Make a GET request to the `endpoint` and return a stream of byte chunks.
+    pub fn get_stream<'a>(
+        &'a self,
+        endpoint: impl AsRef<str> + 'a,
+    ) -> impl Stream<Item = Result<Bytes, E>> + 'a {
+        self.get_stream_impl(endpoint).try_flatten_stream()
     }
 
     /// Make a GET request to the `endpoint` and return a stream of JSON chunk results.
@@ -118,7 +129,11 @@ impl<E: From<conn::Error> + From<serde_json::Error>> RequestClient<E> {
         B: Into<Body>,
     {
         let req = self.make_request(Method::POST, endpoint.as_ref(), body, headers);
-        self.transport.request(req).await.map_err(E::from)
+        self.transport
+            .request(req)
+            .await
+            .map_err(E::from)
+            .and_then(|resp| (&self.validate_fn)(resp))
     }
 
     /// Make a POST request to the `endpoint` and return the response as a string.
@@ -132,10 +147,7 @@ impl<E: From<conn::Error> + From<serde_json::Error>> RequestClient<E> {
         B: Into<Body>,
     {
         let response = self.post(endpoint, body, headers).await?;
-        self.transport
-            .get_response_string(response)
-            .await
-            .map_err(E::from)
+        get_response_string(response).await.map_err(E::from)
     }
 
     /// Make a POST request to the `endpoint` and return the response as a JSON
@@ -155,36 +167,62 @@ impl<E: From<conn::Error> + From<serde_json::Error>> RequestClient<E> {
         serde_json::from_str::<T>(&raw_string).map_err(E::from)
     }
 
+    async fn post_stream_impl<B>(
+        &self,
+        endpoint: impl AsRef<str>,
+        body: Payload<B>,
+        headers: Option<Headers>,
+    ) -> Result<impl Stream<Item = Result<Bytes, E>> + '_, E>
+    where
+        B: Into<Body>,
+    {
+        let response = self.post(endpoint, body, headers).await?;
+        Ok(stream_response(response).map_err(E::from))
+    }
+
     /// Make a straeming POST request to the `endpoint` and return a
     /// stream of byte chunks.
     ///
     /// Use [`post_into_stream`](RequestClient::post_into_stream) if the endpoint
     /// returns JSON values.
-    pub fn post_stream<B>(
+    pub fn post_stream<'transport, B>(
+        &'transport self,
+        endpoint: impl AsRef<str> + 'transport,
+        body: Payload<B>,
+        headers: Option<Headers>,
+    ) -> impl Stream<Item = Result<Bytes, E>> + 'transport
+    where
+        B: Into<Body> + 'transport,
+    {
+        self.post_stream_impl(endpoint, body, headers)
+            .try_flatten_stream()
+    }
+
+    async fn post_json_stream_impl<B>(
         &self,
         endpoint: impl AsRef<str>,
         body: Payload<B>,
         headers: Option<Headers>,
-    ) -> impl Stream<Item = Result<Bytes, E>> + '_
+    ) -> Result<impl Stream<Item = Result<Bytes, E>> + '_, E>
     where
         B: Into<Body>,
     {
-        let req = self.make_request(Method::POST, endpoint.as_ref(), body, headers);
-        self.transport.stream_chunks(req).map_err(E::from)
+        let response = self.post(endpoint, body, headers).await?;
+        Ok(stream_json_response(response).map_err(E::from))
     }
 
     /// Send a streaming post request.
-    fn post_json_stream<B>(
-        &self,
-        endpoint: impl AsRef<str>,
+    fn post_json_stream<'transport, B>(
+        &'transport self,
+        endpoint: impl AsRef<str> + 'transport,
         body: Payload<B>,
         headers: Option<Headers>,
-    ) -> impl Stream<Item = Result<Bytes, E>> + '_
+    ) -> impl Stream<Item = Result<Bytes, E>> + 'transport
     where
-        B: Into<Body>,
+        B: Into<Body> + 'transport,
     {
-        let req = self.make_request(Method::POST, endpoint.as_ref(), body, headers);
-        self.transport.stream_json_chunks(req).map_err(E::from)
+        self.post_json_stream_impl(endpoint, body, headers)
+            .try_flatten_stream()
     }
 
     /// Make a streaming POST request to the `endpoint` and return a stream of
@@ -222,8 +260,7 @@ impl<E: From<conn::Error> + From<serde_json::Error>> RequestClient<E> {
     where
         B: Into<Body> + 'client,
     {
-        self.transport
-            .stream_upgrade(Method::POST, endpoint, body)
+        self.stream_upgrade(Method::POST, endpoint, body)
             .await
             .map_err(E::from)
     }
@@ -242,7 +279,11 @@ impl<E: From<conn::Error> + From<serde_json::Error>> RequestClient<E> {
         B: Into<Body>,
     {
         let req = self.make_request(Method::PUT, endpoint.as_ref(), body, Headers::none());
-        self.transport.request(req).await.map_err(E::from)
+        self.transport
+            .request(req)
+            .await
+            .map_err(E::from)
+            .and_then(|resp| (&self.validate_fn)(resp))
     }
 
     /// Make a PUT request to the `endpoint` and return the response as a string.
@@ -255,10 +296,7 @@ impl<E: From<conn::Error> + From<serde_json::Error>> RequestClient<E> {
         B: Into<Body>,
     {
         let response = self.put(endpoint, body).await?;
-        self.transport
-            .get_response_string(response)
-            .await
-            .map_err(E::from)
+        get_response_string(response).await.map_err(E::from)
     }
 
     //####################################################################################################
@@ -273,16 +311,17 @@ impl<E: From<conn::Error> + From<serde_json::Error>> RequestClient<E> {
             Payload::empty(),
             Headers::none(),
         );
-        self.transport.request(req).await.map_err(E::from)
+        self.transport
+            .request(req)
+            .await
+            .map_err(E::from)
+            .and_then(|resp| (&self.validate_fn)(resp))
     }
 
     /// Make a DELETE request to the `endpoint` and return the response as a string.
     pub async fn delete_string(&self, endpoint: impl AsRef<str>) -> Result<String, E> {
         let response = self.delete(endpoint).await?;
-        self.transport
-            .get_response_string(response)
-            .await
-            .map_err(E::from)
+        get_response_string(response).await.map_err(E::from)
     }
 
     /// Make a DELETE request to the `endpoint` and return the response as a JSON
@@ -308,6 +347,60 @@ impl<E: From<conn::Error> + From<serde_json::Error>> RequestClient<E> {
             Payload::empty(),
             Headers::none(),
         );
-        self.transport.request(req).await.map_err(E::from)
+        self.transport
+            .request(req)
+            .await
+            .map_err(E::from)
+            .and_then(|resp| (&self.validate_fn)(resp))
+    }
+
+    //####################################################################################################
+    // STREAM
+    //####################################################################################################
+
+    async fn stream_upgrade<B>(
+        &self,
+        method: Method,
+        endpoint: impl AsRef<str>,
+        body: Payload<B>,
+    ) -> Result<impl AsyncRead + AsyncWrite, E>
+    where
+        B: Into<Body>,
+    {
+        self.stream_upgrade_tokio(method, endpoint.as_ref(), body)
+            .await
+            .map(Compat::new)
+    }
+
+    /// Makes an HTTP request, upgrading the connection to a TCP
+    /// stream on success.
+    async fn stream_upgrade_tokio<B>(
+        &self,
+        method: Method,
+        endpoint: &str,
+        body: Payload<B>,
+    ) -> Result<hyper::upgrade::Upgraded, E>
+    where
+        B: Into<Body>,
+    {
+        let mut headers = Headers::default();
+        headers.add(header::CONNECTION.as_str(), "Upgrade");
+        headers.add(header::UPGRADE.as_str(), "tcp");
+
+        let uri = self.transport.make_uri(endpoint)?;
+        let req = build_request(method, uri, body, Some(headers));
+
+        let response = self
+            .transport
+            .request(req)
+            .await
+            .map_err(E::from)
+            .and_then(|resp| (&self.validate_fn)(resp))?;
+        match response.status() {
+            StatusCode::SWITCHING_PROTOCOLS => Ok(hyper::upgrade::on(response)
+                .await
+                .map_err(conn::Error::from)?),
+            _ => Err(E::from(conn::Error::ConnectionNotUpgraded)),
+        }
     }
 }
