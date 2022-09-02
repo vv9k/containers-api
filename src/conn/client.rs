@@ -10,6 +10,8 @@ use futures_util::{
 use hyper::{body::Bytes, header, Body, Method, Request, Response, StatusCode};
 use log::trace;
 use serde::de::DeserializeOwned;
+use std::future::Future;
+use std::pin::Pin;
 
 #[derive(Debug, Clone)]
 pub struct RequestClient<E> {
@@ -18,7 +20,8 @@ pub struct RequestClient<E> {
     _error_type: std::marker::PhantomData<E>,
 }
 
-pub type ValidateResponseFn<E> = fn(Response<Body>) -> Result<Response<Body>, E>;
+pub type ValidateResponseFn<E> =
+    fn(Response<Body>) -> Pin<Box<dyn Future<Output = Result<Response<Body>, E>>>>;
 
 impl<E: From<conn::Error> + From<serde_json::Error>> RequestClient<E> {
     /// Creates a new RequestClient with a specified transport and a function to validate
@@ -45,6 +48,11 @@ impl<E: From<conn::Error> + From<serde_json::Error>> RequestClient<E> {
         build_request(method, uri, body, headers)
     }
 
+    async fn send_request(&self, request: Request<Body>) -> Result<Response<Body>, E> {
+        let response = self.transport.request(request).await.map_err(E::from)?;
+        (&self.validate_fn)(response).await
+    }
+
     //####################################################################################################
     // GET
     //####################################################################################################
@@ -57,11 +65,7 @@ impl<E: From<conn::Error> + From<serde_json::Error>> RequestClient<E> {
             Payload::empty(),
             Headers::none(),
         );
-        self.transport
-            .request(req)
-            .await
-            .map_err(E::from)
-            .and_then(|resp| (&self.validate_fn)(resp))
+        self.send_request(req?).await
     }
 
     /// Make a GET request to the `endpoint` and return the response as a string.
@@ -82,7 +86,6 @@ impl<E: From<conn::Error> + From<serde_json::Error>> RequestClient<E> {
         endpoint: impl AsRef<str>,
     ) -> Result<impl Stream<Item = Result<Bytes, E>> + '_, E> {
         let response = self.get(endpoint).await?;
-        let response = (&self.validate_fn)(response)?;
         Ok(stream_response(response).map_err(E::from))
     }
 
@@ -131,11 +134,7 @@ impl<E: From<conn::Error> + From<serde_json::Error>> RequestClient<E> {
         B: Into<Body>,
     {
         let req = self.make_request(Method::POST, endpoint.as_ref(), body, headers);
-        self.transport
-            .request(req)
-            .await
-            .map_err(E::from)
-            .and_then(|resp| (&self.validate_fn)(resp))
+        self.send_request(req?).await
     }
 
     /// Make a POST request to the `endpoint` and return the response as a string.
@@ -281,11 +280,7 @@ impl<E: From<conn::Error> + From<serde_json::Error>> RequestClient<E> {
         B: Into<Body>,
     {
         let req = self.make_request(Method::PUT, endpoint.as_ref(), body, Headers::none());
-        self.transport
-            .request(req)
-            .await
-            .map_err(E::from)
-            .and_then(|resp| (&self.validate_fn)(resp))
+        self.send_request(req?).await
     }
 
     /// Make a PUT request to the `endpoint` and return the response as a string.
@@ -313,11 +308,7 @@ impl<E: From<conn::Error> + From<serde_json::Error>> RequestClient<E> {
             Payload::empty(),
             Headers::none(),
         );
-        self.transport
-            .request(req)
-            .await
-            .map_err(E::from)
-            .and_then(|resp| (&self.validate_fn)(resp))
+        self.send_request(req?).await
     }
 
     /// Make a DELETE request to the `endpoint` and return the response as a string.
@@ -349,11 +340,7 @@ impl<E: From<conn::Error> + From<serde_json::Error>> RequestClient<E> {
             Payload::empty(),
             Headers::none(),
         );
-        self.transport
-            .request(req)
-            .await
-            .map_err(E::from)
-            .and_then(|resp| (&self.validate_fn)(resp))
+        self.send_request(req?).await
     }
 
     //####################################################################################################
@@ -389,15 +376,9 @@ impl<E: From<conn::Error> + From<serde_json::Error>> RequestClient<E> {
         headers.add(header::CONNECTION.as_str(), "Upgrade");
         headers.add(header::UPGRADE.as_str(), "tcp");
 
-        let uri = self.transport.make_uri(endpoint)?;
-        let req = build_request(method, uri, body, Some(headers));
+        let req = self.make_request(method, endpoint, body, Some(headers));
 
-        let response = self
-            .transport
-            .request(req)
-            .await
-            .map_err(E::from)
-            .and_then(|resp| (&self.validate_fn)(resp))?;
+        let response = self.send_request(req?).await?;
         match response.status() {
             StatusCode::SWITCHING_PROTOCOLS => Ok(hyper::upgrade::on(response)
                 .await

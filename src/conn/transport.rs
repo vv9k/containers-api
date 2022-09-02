@@ -69,17 +69,8 @@ impl Transport {
         }
     }
 
-    pub async fn request(&self, req: Result<Request<Body>>) -> Result<Response<Body>> {
-        self.send_request(req?).await
-    }
-
-    pub async fn request_string(&self, req: Result<Request<Body>>) -> Result<String> {
-        let body = self.request(req).await.map(|resp| resp.into_body())?;
-        body_to_string(body).await
-    }
-
     /// Send the given request and return a Future of the response.
-    async fn send_request(&self, req: Request<Body>) -> Result<Response<Body>> {
+    pub async fn request(&self, req: Request<Body>) -> Result<Response<Body>> {
         log::trace!("sending request {} {}", req.method(), req.uri());
         match self {
             Transport::Tcp { ref client, .. } => client.request(req),
@@ -90,6 +81,11 @@ impl Transport {
         }
         .await
         .map_err(Error::from)
+    }
+
+    pub async fn request_string(&self, req: Request<Body>) -> Result<String> {
+        let body = self.request(req).await.map(|resp| resp.into_body())?;
+        body_to_string(body).await
     }
 }
 
