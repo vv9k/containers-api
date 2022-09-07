@@ -50,7 +50,7 @@ impl<E: From<conn::Error> + From<serde_json::Error>> RequestClient<E> {
 
     async fn send_request(&self, request: Request<Body>) -> Result<Response<Body>, E> {
         let response = self.transport.request(request).await.map_err(E::from)?;
-        (&self.validate_fn)(response).await
+        (self.validate_fn)(response).await
     }
 
     //####################################################################################################
