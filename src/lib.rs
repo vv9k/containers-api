@@ -1,3 +1,5 @@
+#![cfg_attr(docsrs, feature(doc_cfg))]
+
 pub mod conn;
 #[cfg(feature = "chrono")]
 pub mod datetime;
