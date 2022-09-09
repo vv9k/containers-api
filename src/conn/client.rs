@@ -21,7 +21,7 @@ pub struct RequestClient<E> {
 }
 
 pub type ValidateResponseFn<E> =
-    fn(Response<Body>) -> Pin<Box<dyn Future<Output = Result<Response<Body>, E>>>>;
+    fn(Response<Body>) -> Pin<Box<dyn Future<Output = Result<Response<Body>, E>> + Send + Sync>>;
 
 impl<E: From<conn::Error> + From<serde_json::Error>> RequestClient<E> {
     /// Creates a new RequestClient with a specified transport and a function to validate
