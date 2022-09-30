@@ -18,8 +18,7 @@ serde_json = "1"
 mime = "0.3"
 url = "2.1"
 tokio = "1"
-futures-util = "0.3"
-futures_codec = "0.4"
+futures-util = { version = "0.3", features = ["io"] }
 http = "0.2"
 pin-project = "1"
 hyper = { version="0.14", features=["client", "http1", "tcp", "stream"] }
