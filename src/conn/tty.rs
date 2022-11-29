@@ -2,11 +2,15 @@
 
 use crate::conn::{Error, Result};
 use futures_util::{
-    io::{AsyncRead, AsyncReadExt, AsyncWrite},
+    io::{AsyncRead, AsyncReadExt, AsyncWrite, ReadHalf},
     stream::{Stream, TryStreamExt},
 };
 use pin_project::pin_project;
 use std::{convert::TryInto, io};
+use std::{
+    pin::Pin,
+    task::{Context, Poll},
+};
 
 #[derive(Debug, Clone)]
 #[allow(clippy::enum_variant_names)]
@@ -93,6 +97,20 @@ where
     futures_util::stream::unfold(stream, decode_chunk)
 }
 
+pub async fn decode_raw<S>(stream: S) -> Option<(Result<TtyChunk>, S)>
+where
+    S: AsyncRead + Unpin,
+{
+    use futures_util::io::AsyncBufReadExt;
+    let mut reader = futures_util::io::BufReader::new(stream);
+    match reader.fill_buf().await {
+        Ok(buf) if buf.is_empty() => None,
+        Ok(buf) => Some((Ok(TtyChunk::StdOut(buf.to_vec())), reader.into_inner())),
+        Err(e) if e.kind() == futures_util::io::ErrorKind::UnexpectedEof => None,
+        Err(e) => Some((Err(Error::IO(e)), reader.into_inner())),
+    }
+}
+
 type TtyReader<'a> = Pin<Box<dyn Stream<Item = Result<TtyChunk>> + Send + 'a>>;
 type TtyWriter<'a> = Pin<Box<dyn AsyncWrite + Send + 'a>>;
 
@@ -106,26 +124,22 @@ pub struct Multiplexer<'a> {
 }
 
 impl<'a> Multiplexer<'a> {
-    #[allow(dead_code)]
-    pub fn new<T>(tcp_connection: T) -> Self
+    pub fn new<Con, F, Fut>(tcp_connection: Con, mut read_fn: F) -> Self
     where
-        T: AsyncRead + AsyncWrite + Send + 'a,
+        Con: AsyncRead + AsyncWrite + Send + 'a,
+        F: FnMut(ReadHalf<Con>) -> Fut + Send + 'a,
+        Fut: futures_util::Future<Output = Option<(Result<TtyChunk>, ReadHalf<Con>)>> + Send + 'a,
     {
         let (reader, writer) = tcp_connection.split();
 
         Self {
-            reader: Box::pin(futures_util::stream::unfold(reader, |reader| {
-                decode_chunk(reader)
+            reader: Box::pin(futures_util::stream::unfold(reader, move |reader| {
+                read_fn(reader)
             })),
             writer: Box::pin(writer),
         }
     }
 }
-
-use std::{
-    pin::Pin,
-    task::{Context, Poll},
-};
 
 impl<'a> Stream for Multiplexer<'a> {
     type Item = Result<TtyChunk>;
