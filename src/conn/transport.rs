@@ -65,7 +65,7 @@ impl Transport {
                 format!("{}{}", host, ep).parse().map_err(Error::InvalidUri)
             }
             #[cfg(unix)]
-            Transport::Unix { path, .. } => Ok(DomainUri::new(&path, ep).into()),
+            Transport::Unix { path, .. } => Ok(DomainUri::new(path, ep).into()),
         }
     }
 
