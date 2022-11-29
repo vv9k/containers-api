@@ -8,7 +8,8 @@ pub fn datetime_from_unix_timestamp<'de, D>(deserializer: D) -> Result<DateTime<
 where
     D: serde::Deserializer<'de>,
 {
-    let timestamp = chrono::NaiveDateTime::from_timestamp(i64::deserialize(deserializer)?, 0);
+    let timestamp = chrono::NaiveDateTime::from_timestamp_opt(i64::deserialize(deserializer)?, 0)
+        .unwrap_or_default();
     Ok(DateTime::<Utc>::from_utc(timestamp, Utc))
 }
 
@@ -18,9 +19,10 @@ where
     D: serde::Deserializer<'de>,
 {
     let timestamp_nano = u64::deserialize(deserializer)?;
-    let timestamp = chrono::NaiveDateTime::from_timestamp(
+    let timestamp = chrono::NaiveDateTime::from_timestamp_opt(
         (timestamp_nano / 1_000_000_000) as i64,
         (timestamp_nano % 1_000_000_000) as u32,
-    );
+    )
+    .unwrap_or_default();
     Ok(DateTime::<Utc>::from_utc(timestamp, Utc))
 }
