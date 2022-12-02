@@ -1,6 +1,6 @@
 [package]
 name = "containers-api"
-version = "0.6.0"
+version = "0.7.0"
 edition = "2021"
 authors = ["Wojciech Kępka <wojciech@wkepka.dev>"]
 description = "Common functionality used in podman-api and docker-api crates."
