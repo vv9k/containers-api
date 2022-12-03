@@ -261,7 +261,7 @@ macro_rules! impl_opts_builder {
             )*
             #[derive(serde::Serialize, Debug, Default, Clone)]
             pub struct [< $name Opts >] {
-                params: std::collections::BTreeMap<&'static str, $ty>,
+                pub(crate) params: std::collections::BTreeMap<&'static str, $ty>,
             }
             impl [< $name Opts >] {
                 #[doc = concat!("Returns a new instance of a builder for ", stringify!($name), "Opts.")]
@@ -273,7 +273,7 @@ macro_rules! impl_opts_builder {
             #[doc = concat!("A builder struct for ", stringify!($name), "Opts.")]
             #[derive(Default, Debug, Clone)]
             pub struct [< $name OptsBuilder >] {
-                params: std::collections::BTreeMap<&'static str, $ty>,
+                pub(crate) params: std::collections::BTreeMap<&'static str, $ty>,
             }
 
             impl [< $name OptsBuilder >] {
@@ -293,8 +293,8 @@ macro_rules! impl_opts_builder {
             )*
             #[derive(serde::Serialize, Debug, Default, Clone)]
             pub struct [< $name Opts >] {
-                params: std::collections::BTreeMap<&'static str, $ty>,
-                vec_params: std::collections::BTreeMap<&'static str, Vec<$ty>>,
+                pub(crate) params: std::collections::BTreeMap<&'static str, $ty>,
+                pub(crate) vec_params: std::collections::BTreeMap<&'static str, Vec<$ty>>,
             }
             impl [< $name Opts >] {
                 #[doc = concat!("Returns a new instance of a builder for ", stringify!($name), "Opts.")]
@@ -306,8 +306,8 @@ macro_rules! impl_opts_builder {
             #[doc = concat!("A builder struct for ", stringify!($name), "Opts.")]
             #[derive(Default, Debug, Clone)]
             pub struct [< $name OptsBuilder >] {
-                params: std::collections::BTreeMap<&'static str, $ty>,
-                vec_params: std::collections::BTreeMap<&'static str, Vec<$ty>>,
+                pub(crate) params: std::collections::BTreeMap<&'static str, $ty>,
+                pub(crate) vec_params: std::collections::BTreeMap<&'static str, Vec<$ty>>,
             }
 
             impl [< $name OptsBuilder >] {
@@ -374,7 +374,7 @@ macro_rules! impl_opts_required_builder {
             )*
             #[derive(serde::Serialize, Debug, Default, Clone)]
             pub struct [< $name Opts >] {
-                params: std::collections::BTreeMap<&'static str, $ty>,
+                pub(crate) params: std::collections::BTreeMap<&'static str, $ty>,
             }
             impl [< $name Opts >] {
                 #[doc = concat!("Returns a new instance of a builder for ", stringify!($name), "Opts.")]
@@ -393,7 +393,7 @@ macro_rules! impl_opts_required_builder {
             #[doc = concat!("A builder struct for ", stringify!($name), "Opts.")]
             #[derive(Debug, Clone)]
             pub struct [< $name OptsBuilder >] {
-                params: std::collections::BTreeMap<&'static str, $ty>,
+                pub(crate) params: std::collections::BTreeMap<&'static str, $ty>,
             }
 
             impl [< $name OptsBuilder >] {
@@ -423,8 +423,8 @@ macro_rules! impl_opts_required_builder {
             )*
             #[derive(serde::Serialize, Debug, Default, Clone)]
             pub struct [< $name Opts >] {
-                params: std::collections::BTreeMap<&'static str, $ty>,
-                vec_params: std::collections::BTreeMap<&'static str, Vec<$ty>>,
+                pub(crate) params: std::collections::BTreeMap<&'static str, $ty>,
+                pub(crate) vec_params: std::collections::BTreeMap<&'static str, Vec<$ty>>,
                 [< $param >]: $ty,
             }
             impl [< $name Opts >] {
@@ -448,8 +448,8 @@ macro_rules! impl_opts_required_builder {
             #[doc = concat!("A builder struct for ", stringify!($name), "Opts.")]
             #[derive(Debug, Clone)]
             pub struct [< $name OptsBuilder >] {
-                params: std::collections::BTreeMap<&'static str, $ty>,
-                vec_params: std::collections::BTreeMap<&'static str, Vec<$ty>>,
+                pub(crate) params: std::collections::BTreeMap<&'static str, $ty>,
+                pub(crate) vec_params: std::collections::BTreeMap<&'static str, Vec<$ty>>,
                 [< $param >]: $ty,
             }
 
