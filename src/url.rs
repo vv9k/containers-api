@@ -68,7 +68,7 @@ where
         .fold(
             form_urlencoded::Serializer::new(String::new()),
             |mut acc, v| {
-                let &(ref k, ref v) = v.borrow();
+                let (k, v) = v.borrow();
                 let k = k.as_ref();
                 let v = v.as_ref();
                 if v.is_empty() {

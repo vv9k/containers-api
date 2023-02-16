@@ -538,7 +538,7 @@ mod test {
                 match &self {
                     Id(id) => FilterItem::new("id", id.to_string()),
                     LabelKey(key) => FilterItem::new("label", key.clone()),
-                    LabelKeyVal(key, val) => FilterItem::new("label", format!("{}={}", key, val)),
+                    LabelKeyVal(key, val) => FilterItem::new("label", format!("{key}={val}")),
                 }
             }
         }

@@ -57,12 +57,10 @@ impl Transport {
 
     pub fn make_uri(&self, ep: &str) -> Result<hyper::Uri> {
         match self {
-            Transport::Tcp { host, .. } => {
-                format!("{}{}", host, ep).parse().map_err(Error::InvalidUri)
-            }
+            Transport::Tcp { host, .. } => format!("{host}{ep}").parse().map_err(Error::InvalidUri),
             #[cfg(feature = "tls")]
             Transport::EncryptedTcp { host, .. } => {
-                format!("{}{}", host, ep).parse().map_err(Error::InvalidUri)
+                format!("{host}{ep}").parse().map_err(Error::InvalidUri)
             }
             #[cfg(unix)]
             Transport::Unix { path, .. } => Ok(DomainUri::new(path, ep).into()),
