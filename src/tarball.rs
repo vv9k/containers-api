@@ -8,6 +8,12 @@ use std::{
 };
 use tar::Builder;
 
+#[cfg(feature = "par-compress")]
+use gzp::{
+    deflate::Gzip,
+    par::compress::{ParCompress, ParCompressBuilder},
+};
+
 /// Writes a gunzip encoded tarball to `buf` from entries found in `path`.
 pub fn dir<W, P>(buf: W, path: P) -> io::Result<()>
 where
@@ -29,8 +35,6 @@ pub fn dir_par<P>(path: P) -> io::Result<Vec<u8>>
 where
     P: AsRef<Path>,
 {
-    use gzp::deflate::Gzip;
-    use gzp::par::compress::{ParCompress, ParCompressBuilder};
     use memfile::MemFile;
     use std::io::{Read, Seek};
 
@@ -41,6 +45,33 @@ where
     let path = path.as_ref();
     ArchiveBuilder::build(encoder, path)?;
 
+    rx.rewind()?;
+    let mut data = vec![];
+    rx.read_to_end(&mut data)?;
+    Ok(data)
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "android", target_os = "freebsd")))]
+#[cfg(unix)]
+#[cfg(feature = "par-compress")]
+/// Same as [`dir`](dir) but initializes the underlying buffer, returns it and utilizes compression
+/// parallelization on multiple cores to speed up the work.
+pub fn dir_par<P>(path: P) -> io::Result<Vec<u8>>
+where
+    P: AsRef<Path>,
+{
+    use std::io::{Read, Seek};
+
+    let tmp_dir = tempfile::tempdir()?;
+    let tmp_file_path = tmp_dir.path().join("data");
+    let tx = std::fs::File::create(&tmp_file_path)?;
+
+    let encoder: ParCompress<Gzip> = ParCompressBuilder::new().from_writer(tx);
+
+    let path = path.as_ref();
+    ArchiveBuilder::build(encoder, path)?;
+
+    let mut rx = std::fs::File::open(&tmp_file_path)?;
     rx.rewind()?;
     let mut data = vec![];
     rx.read_to_end(&mut data)?;
