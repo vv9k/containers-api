@@ -29,15 +29,15 @@ chrono = { version="0.4", optional=true, features=["serde"] }
 
 tar = "0.4"
 flate2 = "1"
+gzp = { version = "0.11", optional=true }
 
 paste = "1"
 
 
 [target.'cfg(unix)'.dependencies]
 hyperlocal = { version="0.8" }
-gzp = { version = "0.11", optional=true }
 
-[target.'cfg(all(unix, not(any(target_os = "linux", target_os = "android", target_os = "freebsd"))))'.dependencies]
+[target.'cfg(not(any(target_os = "linux", target_os = "android", target_os = "freebsd")))'.dependencies]
 tempfile = { version = "3", optional=true }
 
 [target.'cfg(any(target_os = "linux", target_os = "android", target_os = "freebsd"))'.dependencies]

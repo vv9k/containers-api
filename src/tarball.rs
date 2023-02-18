@@ -52,7 +52,6 @@ where
 }
 
 #[cfg(not(any(target_os = "linux", target_os = "android", target_os = "freebsd")))]
-#[cfg(unix)]
 #[cfg(feature = "par-compress")]
 /// Same as [`dir`](dir) but initializes the underlying buffer, returns it and utilizes compression
 /// parallelization on multiple cores to speed up the work.
