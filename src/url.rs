@@ -81,3 +81,52 @@ where
         )
         .finish()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{append_query, construct_ep, encoded_pair, encoded_pairs, encoded_vec_pairs};
+
+    #[test]
+    fn appends_query() {
+        let mut ep = "http://somewebsite.xxx".to_owned();
+        let query = "lang=en";
+        let want = "http://somewebsite.xxx?lang=en";
+        append_query(&mut ep, query);
+        assert_eq!(ep, want);
+    }
+
+    #[test]
+    fn constructs_endpoint() {
+        let ep = "http://somewebsite.xxx";
+        let query = "lang=en,id=55555";
+        let want = "http://somewebsite.xxx?lang=en,id=55555";
+        assert_eq!(construct_ep(ep, None::<&str>), ep);
+        assert_eq!(construct_ep(ep, Some(query)), want);
+    }
+
+    #[test]
+    fn encodes_pair() {
+        let key = "lang";
+        let val = "en&";
+        let want = "lang=en%26";
+        assert_eq!(encoded_pair(key, val), want);
+    }
+
+    #[test]
+    fn encodes_pairs() {
+        let pairs = [("lang", "en&"), ("id", "1337"), ("country", "xxx")];
+        let want = "lang=en%26&id=1337&country=xxx";
+        assert_eq!(encoded_pairs(pairs), want);
+    }
+
+    #[test]
+    fn encodes_vec_pairs() {
+        let pairs = [
+            ("lang", vec!["en", "pl&"]),
+            ("id", vec!["1337"]),
+            ("country", vec!["xxx", "yyy", "zzz"]),
+        ];
+        let want = "lang=en&lang=pl%26&id=1337&country=xxx&country=yyy&country=zzz";
+        assert_eq!(encoded_vec_pairs(pairs), want);
+    }
+}
