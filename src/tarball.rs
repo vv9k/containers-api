@@ -150,3 +150,60 @@ impl<W: Write> ArchiveBuilder<W> {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use flate2::read::GzDecoder;
+    use tar::Archive;
+    const N_DIRS: usize = 3;
+    const N_ENTRIES: usize = 10;
+
+    fn _prepare_dirs(tmp: &std::path::Path) {
+        for i in 1..=N_DIRS {
+            let d_path = tmp.join(&format!("d{i}"));
+            std::fs::create_dir(&d_path).unwrap();
+            for j in 1..=N_ENTRIES {
+                let f_path = d_path.join(&format!("f{}", i * j));
+                let mut f = std::fs::File::create(&f_path).unwrap();
+                let _ = f.write(&[j as u8]).unwrap();
+                f.flush().unwrap();
+            }
+        }
+    }
+
+    fn _verify_archive(buf: &[u8]) {
+        let decoder = GzDecoder::new(buf);
+        let mut archive = Archive::new(decoder);
+
+        let tmp = tempfile::tempdir().unwrap();
+        archive.unpack(tmp.path()).unwrap();
+
+        for i in 1..=N_DIRS {
+            let d_path = tmp.path().join(&format!("d{i}"));
+            assert!(d_path.exists());
+            for j in 1..=N_ENTRIES {
+                let f_path = d_path.join(&format!("f{}", i * j));
+                assert!(f_path.exists());
+            }
+        }
+    }
+
+    #[test]
+    fn creates_gzipped_dir() {
+        let tmp = tempfile::tempdir().unwrap();
+        _prepare_dirs(tmp.path());
+        let mut buf = vec![];
+        dir(&mut buf, tmp.path()).unwrap();
+        _verify_archive(&buf[..]);
+    }
+
+    #[test]
+    #[cfg(feature = "par-compress")]
+    fn creates_gzipped_dir_par() {
+        let tmp = tempfile::tempdir().unwrap();
+        _prepare_dirs(tmp.path());
+        let buf = dir_par(tmp.path()).unwrap();
+        _verify_archive(&buf[..]);
+    }
+}

@@ -43,6 +43,9 @@ tempfile = { version = "3", optional=true }
 [target.'cfg(any(target_os = "linux", target_os = "android", target_os = "freebsd"))'.dependencies]
 memfile = { version = "0.2", optional=true }
 
+[dev-dependencies]
+tempfile = "3"
+
 [features]
 default = ["chrono"]
 tls = ["openssl", "hyper-openssl"]
