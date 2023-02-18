@@ -50,7 +50,7 @@ tempfile = "3"
 default = ["chrono"]
 tls = ["openssl", "hyper-openssl"]
 vendored-ssl = ["tls", "openssl/vendored"]
-par-compress = ["gzp", "memfile"]
+par-compress = ["gzp", "memfile", "tempfile"]
 
 
 # docs.rs-specific configuration
