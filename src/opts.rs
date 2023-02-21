@@ -397,14 +397,14 @@ macro_rules! impl_opts_builder {
 #[macro_export]
 /// Initialize a `Opts` struct with a required parameter and `OptsBuilder` struct to construct it.
 macro_rules! impl_opts_required_builder {
-    (__builder $name:ident $ty:expr; $(#[doc = $param_docs:expr])* $param:ident) => {
+    (__builder $name:ident $ty:expr; $(#[doc = $param_docs:expr])* $param:ident: $param_ty:expr) => {
         paste::item! {
             impl [< $name Opts >] {
                 #[doc = concat!("Returns a new instance of a builder for ", stringify!($name), "Opts.")]
                 $(
                     #[doc= $param_docs]
                 )*
-                pub fn builder($param: impl Into<$ty>) -> [< $name OptsBuilder >] {
+                pub fn builder($param: impl Into<$param_ty>) -> [< $name OptsBuilder >] {
                     [< $name OptsBuilder >]::new($param)
                 }
 
@@ -414,18 +414,39 @@ macro_rules! impl_opts_required_builder {
             }
         }
     };
-    (base_json $(#[doc = $docs:expr])* $name:ident $ty:expr, $(#[doc = $param_docs:expr])* $param:ident => $param_key:literal) => {
-        $crate::define_opts_builder!(base_json $(#[doc = $docs])* $name $ty);
-        impl_opts_required_builder!(__builder $name $ty; $(#[doc = $param_docs])* $param);
+    (base_json $(#[doc = $docs:expr])* $name:ident, $(#[doc = $param_docs:expr])* $param:ident: $param_ty:expr => $param_key:literal) => {
+        impl_opts_required_builder!(__builder $name serde_json::Value; $(#[doc = $param_docs])* $param: $param_ty);
         paste::item! {
+            $(
+                #[doc= $docs]
+            )*
+            #[derive(serde::Serialize, Debug, Default, Clone)]
+            pub struct [< $name Opts >] {
+                pub(crate) params: std::collections::BTreeMap<&'static str, serde_json::Value>,
+                [< $param >]: $param_ty,
+            }
+            impl [< $name Opts >] {
+                pub fn [< $param >](&self) -> &$param_ty {
+                    &self.$param
+                }
+            }
+
+            #[doc = concat!("A builder struct for ", stringify!($name), "Opts.")]
+            #[derive(Default, Debug, Clone)]
+            pub struct [< $name OptsBuilder >] {
+                pub(crate) params: std::collections::BTreeMap<&'static str, serde_json::Value>,
+                [< $param >]: $param_ty,
+            }
             impl [< $name OptsBuilder >] {
                 #[doc = concat!("A builder struct for ", stringify!($name), "Opts.")]
                 $(
                     #[doc= $param_docs]
                 )*
-                pub fn new($param: impl Into<$ty>) -> Self {
+                pub fn new($param: impl Into<$param_ty>) -> Self {
+                    let param = $param.into();
                     Self {
-                        params: [($param_key, $param.into())].into()
+                        params: [($param_key, serde_json::json!(param.clone()))].into(),
+                        [< $param >]: param,
                     }
                 }
 
@@ -433,25 +454,26 @@ macro_rules! impl_opts_required_builder {
                 pub fn build(self) -> [< $name Opts >] {
                     [< $name Opts >] {
                         params: self.params,
+                        [< $param >]: self.$param
                     }
                 }
             }
        }
     };
-    (base_url $(#[doc = $docs:expr])* $name:ident $ty:expr, $(#[doc = $param_docs:expr])* $param:ident $param_ty:ty => $param_key:literal) => {
-        impl_opts_required_builder!(__builder $name $ty; $(#[doc = $param_docs])* $param);
+    (base_url $(#[doc = $docs:expr])* $name:ident, $(#[doc = $param_docs:expr])* $param:ident: $param_ty:expr => $param_key:literal) => {
+        impl_opts_required_builder!(__builder $name String; $(#[doc = $param_docs])* $param: $param_ty);
         paste::item! {
             $(
                 #[doc= $docs]
             )*
             #[derive(serde::Serialize, Debug, Default, Clone)]
             pub struct [< $name Opts >] {
-                pub(crate) params: std::collections::BTreeMap<&'static str, $ty>,
-                pub(crate) vec_params: std::collections::BTreeMap<&'static str, Vec<$ty>>,
+                pub(crate) params: std::collections::BTreeMap<&'static str, String>,
+                pub(crate) vec_params: std::collections::BTreeMap<&'static str, Vec<String>>,
                 [< $param >]: $param_ty,
             }
             impl [< $name Opts >] {
-                pub fn [< $param >](&self) -> &$ty {
+                pub fn [< $param >](&self) -> &$param_ty {
                     &self.$param
                 }
             }
@@ -459,9 +481,9 @@ macro_rules! impl_opts_required_builder {
             #[doc = concat!("A builder struct for ", stringify!($name), "Opts.")]
             #[derive(Debug, Clone)]
             pub struct [< $name OptsBuilder >] {
-                pub(crate) params: std::collections::BTreeMap<&'static str, $ty>,
-                pub(crate) vec_params: std::collections::BTreeMap<&'static str, Vec<$ty>>,
-                [< $param >]: $ty,
+                pub(crate) params: std::collections::BTreeMap<&'static str, String>,
+                pub(crate) vec_params: std::collections::BTreeMap<&'static str, Vec<String>>,
+                [< $param >]: $param_ty,
             }
 
             impl [< $name OptsBuilder >] {
@@ -469,7 +491,7 @@ macro_rules! impl_opts_required_builder {
                 $(
                     #[doc= $param_docs]
                 )*
-                pub fn new($param: impl Into<$ty>) -> Self {
+                pub fn new($param: impl Into<$param_ty>) -> Self {
                     let param = $param.into();
                     Self {
                         params: [($param_key, param.clone())].into(),
@@ -489,12 +511,20 @@ macro_rules! impl_opts_required_builder {
             }
        }
     };
-    (json => $(#[doc = $docs:expr])* $name:ident, $(#[doc = $param_docs:expr])* $param:ident => $param_key:literal) => {
-        impl_opts_required_builder!(base_json $(#[doc = $docs])* $name serde_json::Value, $(#[doc = $param_docs])* $param => $param_key);
+    (json => $(#[doc = $docs:expr])* $name:ident, $(#[doc = $param_docs:expr])* $param:ident: $param_ty:expr => $param_key:literal) => {
+        impl_opts_required_builder!(base_json $(#[doc = $docs])* $name, $(#[doc = $param_docs])* $param: $param_ty => $param_key);
         $crate::impl_json_serialize!($name);
     };
+    (json => $(#[doc = $docs:expr])* $name:ident, $(#[doc = $param_docs:expr])* $param:ident => $param_key:literal) => {
+        impl_opts_required_builder!(base_json $(#[doc = $docs])* $name, $(#[doc = $param_docs])* $param: serde_json::Value => $param_key);
+        $crate::impl_json_serialize!($name);
+    };
+    (url => $(#[doc = $docs:expr])* $name:ident, $(#[doc = $param_docs:expr])* $param:ident: $param_ty:expr => $param_key:literal) => {
+        impl_opts_required_builder!(base_url $(#[doc = $docs])* $name, $(#[doc = $param_docs])* $param => $param_key);
+        $crate::impl_url_serialize!($name);
+    };
     (url => $(#[doc = $docs:expr])* $name:ident, $(#[doc = $param_docs:expr])* $param:ident => $param_key:literal) => {
-        impl_opts_required_builder!(base_url $(#[doc = $docs])* $name String, $(#[doc = $param_docs])* $param => $param_key);
+        impl_opts_required_builder!(base_url $(#[doc = $docs])* $name, $(#[doc = $param_docs])* $param: String => $param_key);
         $crate::impl_url_serialize!($name);
     };
 }
