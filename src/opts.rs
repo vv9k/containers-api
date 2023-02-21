@@ -250,94 +250,10 @@ macro_rules! impl_filter_func {
     };
 }
 
-#[allow(clippy::crate_in_macro_def)]
 #[macro_export]
-/// Initialize a `Opts` struct with a `OptsBuilder` struct to construct it.
-macro_rules! impl_opts_builder {
-    (base_json $(#[doc = $docs:expr])* $name:ident $ty:expr) => {
+macro_rules! impl_url_serialize {
+    ($name: ident) => {
         paste::item! {
-            $(
-                #[doc= $docs]
-            )*
-            #[derive(serde::Serialize, Debug, Default, Clone)]
-            pub struct [< $name Opts >] {
-                pub(crate) params: std::collections::BTreeMap<&'static str, $ty>,
-            }
-            impl [< $name Opts >] {
-                #[doc = concat!("Returns a new instance of a builder for ", stringify!($name), "Opts.")]
-                pub fn builder() -> [< $name OptsBuilder >] {
-                    [< $name OptsBuilder >]::default()
-                }
-            }
-
-            #[doc = concat!("A builder struct for ", stringify!($name), "Opts.")]
-            #[derive(Default, Debug, Clone)]
-            pub struct [< $name OptsBuilder >] {
-                pub(crate) params: std::collections::BTreeMap<&'static str, $ty>,
-            }
-
-            impl [< $name OptsBuilder >] {
-                #[doc = concat!("Finish building ", stringify!($name), "Opts.")]
-                pub fn build(self) -> [< $name Opts >] {
-                    [< $name Opts >] {
-                        params: self.params,
-                    }
-                }
-            }
-       }
-    };
-    (base_url $(#[doc = $docs:expr])* $name:ident $ty:expr) => {
-        paste::item! {
-            $(
-                #[doc= $docs]
-            )*
-            #[derive(serde::Serialize, Debug, Default, Clone)]
-            pub struct [< $name Opts >] {
-                pub(crate) params: std::collections::BTreeMap<&'static str, $ty>,
-                pub(crate) vec_params: std::collections::BTreeMap<&'static str, Vec<$ty>>,
-            }
-            impl [< $name Opts >] {
-                #[doc = concat!("Returns a new instance of a builder for ", stringify!($name), "Opts.")]
-                pub fn builder() -> [< $name OptsBuilder >] {
-                    [< $name OptsBuilder >]::default()
-                }
-            }
-
-            #[doc = concat!("A builder struct for ", stringify!($name), "Opts.")]
-            #[derive(Default, Debug, Clone)]
-            pub struct [< $name OptsBuilder >] {
-                pub(crate) params: std::collections::BTreeMap<&'static str, $ty>,
-                pub(crate) vec_params: std::collections::BTreeMap<&'static str, Vec<$ty>>,
-            }
-
-            impl [< $name OptsBuilder >] {
-                #[doc = concat!("Finish building ", stringify!($name), "Opts.")]
-                pub fn build(self) -> [< $name Opts >] {
-                    [< $name Opts >] {
-                        params: self.params,
-                        vec_params: self.vec_params
-                    }
-                }
-            }
-       }
-    };
-    (json => $(#[doc = $docs:expr])* $name:ident) => {
-        paste::item! {
-            impl_opts_builder!(base_json $(#[doc = $docs])* $name serde_json::Value);
-
-            impl [< $name Opts >] {
-                /// Serialize options as a JSON String. Returns an error if the options will fail
-                /// to serialize.
-                pub fn serialize(&self) -> crate::Result<String> {
-                    serde_json::to_string(&self.params).map_err(crate::Error::from)
-                }
-            }
-        }
-    };
-    (url => $(#[doc = $docs:expr])* $name:ident) => {
-        paste::item! {
-            impl_opts_builder!(base_url $(#[doc = $docs])* $name String);
-
             impl [< $name  Opts >] {
                 /// Serialize options as a URL query String. Returns None if no options are defined.
                 pub fn serialize(&self) -> Option<String> {
@@ -363,11 +279,26 @@ macro_rules! impl_opts_builder {
     };
 }
 
+#[macro_export]
+macro_rules! impl_json_serialize {
+    ($name: ident) => {
+        paste::item! {
+            impl [< $name Opts >] {
+                /// Serialize options as a JSON String. Returns an error if the options will fail
+                /// to serialize.
+                pub fn serialize(&self) -> crate::Result<String> {
+                    serde_json::to_string(&self.params).map_err(crate::Error::from)
+                }
+            }
+        }
+    };
+}
+
 #[allow(clippy::crate_in_macro_def)]
 #[macro_export]
-/// Initialize a `Opts` struct with a required parameter and `OptsBuilder` struct to construct it.
-macro_rules! impl_opts_required_builder {
-    (base_json $(#[doc = $docs:expr])* $name:ident $ty:expr, $(#[doc = $param_docs:expr])* $param:ident => $param_key:literal) => {
+/// Initialize a `Opts` struct with a `OptsBuilder` struct to construct it.
+macro_rules! define_opts_builder {
+    (base_json $(#[doc = $docs:expr])* $name:ident $ty:expr) => {
         paste::item! {
             $(
                 #[doc= $docs]
@@ -376,6 +307,98 @@ macro_rules! impl_opts_required_builder {
             pub struct [< $name Opts >] {
                 pub(crate) params: std::collections::BTreeMap<&'static str, $ty>,
             }
+
+            #[doc = concat!("A builder struct for ", stringify!($name), "Opts.")]
+            #[derive(Default, Debug, Clone)]
+            pub struct [< $name OptsBuilder >] {
+                pub(crate) params: std::collections::BTreeMap<&'static str, $ty>,
+            }
+        }
+    };
+    (base_url $(#[doc = $docs:expr])* $name:ident $ty:expr) => {
+        paste::item! {
+            $(
+                #[doc= $docs]
+            )*
+            #[derive(serde::Serialize, Debug, Default, Clone)]
+            pub struct [< $name Opts >] {
+                pub(crate) params: std::collections::BTreeMap<&'static str, $ty>,
+                pub(crate) vec_params: std::collections::BTreeMap<&'static str, Vec<$ty>>,
+            }
+
+            #[doc = concat!("A builder struct for ", stringify!($name), "Opts.")]
+            #[derive(Default, Debug, Clone)]
+            pub struct [< $name OptsBuilder >] {
+                pub(crate) params: std::collections::BTreeMap<&'static str, $ty>,
+                pub(crate) vec_params: std::collections::BTreeMap<&'static str, Vec<$ty>>,
+            }
+        }
+    }
+}
+
+#[allow(clippy::crate_in_macro_def)]
+#[macro_export]
+/// Initialize a `Opts` struct with a `OptsBuilder` struct to construct it.
+macro_rules! impl_opts_builder {
+    (__builder $name:ident) => {
+        paste::item! {
+            impl [< $name Opts >] {
+                #[doc = concat!("Returns a new instance of a builder for ", stringify!($name), "Opts.")]
+                pub fn builder() -> [< $name OptsBuilder >] {
+                    [< $name OptsBuilder >]::default()
+                }
+            }
+        }
+    };
+    (base_json $(#[doc = $docs:expr])* $name:ident $ty:expr) => {
+        $crate::define_opts_builder!(base_json $(#[doc = $docs])* $name $ty);
+        impl_opts_builder!(__builder $name);
+        paste::item! {
+            impl [< $name OptsBuilder >] {
+                #[doc = concat!("Finish building ", stringify!($name), "Opts.")]
+                pub fn build(self) -> [< $name Opts >] {
+                    [< $name Opts >] {
+                        params: self.params,
+                    }
+                }
+            }
+       }
+    };
+    (base_url $(#[doc = $docs:expr])* $name:ident $ty:expr) => {
+        $crate::define_opts_builder!(base_url $(#[doc = $docs])* $name $ty);
+        impl_opts_builder!(__builder $name);
+        paste::item! {
+            impl [< $name OptsBuilder >] {
+                #[doc = concat!("Finish building ", stringify!($name), "Opts.")]
+                pub fn build(self) -> [< $name Opts >] {
+                    [< $name Opts >] {
+                        params: self.params,
+                        vec_params: self.vec_params
+                    }
+                }
+            }
+       }
+    };
+    (json => $(#[doc = $docs:expr])* $name:ident) => {
+        paste::item! {
+            impl_opts_builder!(base_json $(#[doc = $docs])* $name serde_json::Value);
+            $crate::impl_json_serialize!($name);
+        }
+    };
+    (url => $(#[doc = $docs:expr])* $name:ident) => {
+        paste::item! {
+            impl_opts_builder!(base_url $(#[doc = $docs])* $name String);
+            $crate::impl_url_serialize!($name);
+        }
+    };
+}
+
+#[allow(clippy::crate_in_macro_def)]
+#[macro_export]
+/// Initialize a `Opts` struct with a required parameter and `OptsBuilder` struct to construct it.
+macro_rules! impl_opts_required_builder {
+    (__builder $name:ident $ty:expr; $(#[doc = $param_docs:expr])* $param:ident) => {
+        paste::item! {
             impl [< $name Opts >] {
                 #[doc = concat!("Returns a new instance of a builder for ", stringify!($name), "Opts.")]
                 $(
@@ -389,13 +412,12 @@ macro_rules! impl_opts_required_builder {
                     self.params.get(key)
                 }
             }
-
-            #[doc = concat!("A builder struct for ", stringify!($name), "Opts.")]
-            #[derive(Debug, Clone)]
-            pub struct [< $name OptsBuilder >] {
-                pub(crate) params: std::collections::BTreeMap<&'static str, $ty>,
-            }
-
+        }
+    };
+    (base_json $(#[doc = $docs:expr])* $name:ident $ty:expr, $(#[doc = $param_docs:expr])* $param:ident => $param_key:literal) => {
+        $crate::define_opts_builder!(base_json $(#[doc = $docs])* $name $ty);
+        impl_opts_required_builder!(__builder $name $ty; $(#[doc = $param_docs])* $param);
+        paste::item! {
             impl [< $name OptsBuilder >] {
                 #[doc = concat!("A builder struct for ", stringify!($name), "Opts.")]
                 $(
@@ -416,7 +438,8 @@ macro_rules! impl_opts_required_builder {
             }
        }
     };
-    (base_url $(#[doc = $docs:expr])* $name:ident $ty:expr, $(#[doc = $param_docs:expr])* $param:ident => $param_key:literal) => {
+    (base_url $(#[doc = $docs:expr])* $name:ident $ty:expr, $(#[doc = $param_docs:expr])* $param:ident $param_ty:ty => $param_key:literal) => {
+        impl_opts_required_builder!(__builder $name $ty; $(#[doc = $param_docs])* $param);
         paste::item! {
             $(
                 #[doc= $docs]
@@ -425,21 +448,9 @@ macro_rules! impl_opts_required_builder {
             pub struct [< $name Opts >] {
                 pub(crate) params: std::collections::BTreeMap<&'static str, $ty>,
                 pub(crate) vec_params: std::collections::BTreeMap<&'static str, Vec<$ty>>,
-                [< $param >]: $ty,
+                [< $param >]: $param_ty,
             }
             impl [< $name Opts >] {
-                #[doc = concat!("Returns a new instance of a builder for ", stringify!($name), "Opts.")]
-                $(
-                    #[doc= $param_docs]
-                )*
-                pub fn builder($param: impl Into<$ty>) -> [< $name OptsBuilder >] {
-                    [< $name OptsBuilder >]::new($param)
-                }
-
-                pub fn get_param(&self, key: &str) -> Option<&$ty> {
-                    self.params.get(key)
-                }
-
                 pub fn [< $param >](&self) -> &$ty {
                     &self.$param
                 }
@@ -480,43 +491,11 @@ macro_rules! impl_opts_required_builder {
     };
     (json => $(#[doc = $docs:expr])* $name:ident, $(#[doc = $param_docs:expr])* $param:ident => $param_key:literal) => {
         impl_opts_required_builder!(base_json $(#[doc = $docs])* $name serde_json::Value, $(#[doc = $param_docs])* $param => $param_key);
-
-        paste::item! {
-            impl [< $name Opts >] {
-                /// Serialize options as a JSON String. Returns an error if the options will fail
-                /// to serialize.
-                pub fn serialize(&self) -> crate::Result<String> {
-                    serde_json::to_string(&self.params).map_err(crate::Error::from)
-                }
-            }
-        }
+        $crate::impl_json_serialize!($name);
     };
     (url => $(#[doc = $docs:expr])* $name:ident, $(#[doc = $param_docs:expr])* $param:ident => $param_key:literal) => {
         impl_opts_required_builder!(base_url $(#[doc = $docs])* $name String, $(#[doc = $param_docs])* $param => $param_key);
-
-        paste::item! {
-            impl [< $name  Opts >] {
-                /// Serialize options as a URL query String. Returns None if no options are defined.
-                pub fn serialize(&self) -> Option<String> {
-                    let params = $crate::url::encoded_pairs(&self.params);
-                    let vec_params = $crate::url::encoded_vec_pairs(&self.vec_params);
-
-                    let mut serialized = format!("{params}");
-                    if !vec_params.is_empty() {
-                        if !serialized.is_empty() {
-                            serialized.push('&');
-                        }
-                        serialized.push_str(&vec_params);
-                    }
-
-                    if serialized.is_empty() {
-                        None
-                    } else {
-                        Some(serialized)
-                    }
-                }
-            }
-        }
+        $crate::impl_url_serialize!($name);
     };
 }
 
