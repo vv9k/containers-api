@@ -289,6 +289,12 @@ macro_rules! impl_json_serialize {
                 pub fn serialize(&self) -> crate::Result<String> {
                     serde_json::to_string(&self.params).map_err(crate::Error::from)
                 }
+
+                /// Serialize options as a JSON bytes. Returns an error if the options will fail
+                /// to serialize.
+                pub fn serialize_vec(&self) -> crate::Result<Vec<u8>> {
+                    serde_json::to_vec(&self.params).map_err(crate::Error::from)
+                }
             }
         }
     };
