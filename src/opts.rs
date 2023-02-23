@@ -279,6 +279,7 @@ macro_rules! impl_url_serialize {
     };
 }
 
+#[allow(clippy::crate_in_macro_def)]
 #[macro_export]
 macro_rules! impl_json_serialize {
     ($name: ident) => {
