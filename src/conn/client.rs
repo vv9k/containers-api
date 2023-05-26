@@ -253,13 +253,13 @@ impl<E: From<conn::Error> + From<serde_json::Error>> RequestClient<E> {
             .try_flatten()
     }
 
-    pub async fn post_upgrade_stream<'client, B>(
-        &'client self,
-        endpoint: impl AsRef<str> + 'client,
+    pub async fn post_upgrade_stream<B>(
+        self,
+        endpoint: impl AsRef<str>,
         body: Payload<B>,
-    ) -> Result<impl AsyncRead + AsyncWrite + 'client, E>
+    ) -> Result<impl AsyncRead + AsyncWrite, E>
     where
-        B: Into<Body> + 'client,
+        B: Into<Body>,
     {
         self.stream_upgrade(Method::POST, endpoint, body)
             .await

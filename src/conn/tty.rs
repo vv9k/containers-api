@@ -111,24 +111,24 @@ where
     }
 }
 
-type TtyReader<'a> = Pin<Box<dyn Stream<Item = Result<TtyChunk>> + Send + 'a>>;
-type TtyWriter<'a> = Pin<Box<dyn AsyncWrite + Send + 'a>>;
+type TtyReader = Pin<Box<dyn Stream<Item = Result<TtyChunk>> + Send + 'static>>;
+type TtyWriter = Pin<Box<dyn AsyncWrite + Send + 'static>>;
 
 /// This object can emit a stream of `TtyChunk`s and also implements `AsyncWrite` for streaming bytes to Stdin.
 #[pin_project]
-pub struct Multiplexer<'a> {
+pub struct Multiplexer {
     #[pin]
-    reader: TtyReader<'a>,
+    reader: TtyReader,
     #[pin]
-    writer: TtyWriter<'a>,
+    writer: TtyWriter,
 }
 
-impl<'a> Multiplexer<'a> {
+impl Multiplexer {
     pub fn new<Con, F, Fut>(tcp_connection: Con, mut read_fn: F) -> Self
     where
-        Con: AsyncRead + AsyncWrite + Send + 'a,
-        F: FnMut(ReadHalf<Con>) -> Fut + Send + 'a,
-        Fut: futures_util::Future<Output = Option<(Result<TtyChunk>, ReadHalf<Con>)>> + Send + 'a,
+        Con: AsyncRead + AsyncWrite + Send + 'static,
+        F: FnMut(ReadHalf<Con>) -> Fut + Send + 'static,
+        Fut: futures_util::Future<Output = Option<(Result<TtyChunk>, ReadHalf<Con>)>> + Send + 'static,
     {
         let (reader, writer) = tcp_connection.split();
 
@@ -141,14 +141,14 @@ impl<'a> Multiplexer<'a> {
     }
 }
 
-impl<'a> Stream for Multiplexer<'a> {
+impl Stream for Multiplexer {
     type Item = Result<TtyChunk>;
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         self.project().reader.poll_next(cx)
     }
 }
 
-impl<'a> AsyncWrite for Multiplexer<'a> {
+impl AsyncWrite for Multiplexer {
     fn poll_write(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -164,13 +164,13 @@ impl<'a> AsyncWrite for Multiplexer<'a> {
     }
 }
 
-impl<'a> Multiplexer<'a> {
+impl Multiplexer {
     /// Split the `Multiplexer` into the component `Stream` and `AsyncWrite` parts
     pub fn split(
         self,
     ) -> (
-        impl Stream<Item = Result<TtyChunk>> + 'a,
-        impl AsyncWrite + Send + 'a,
+        impl Stream<Item = Result<TtyChunk>>,
+        impl AsyncWrite + Send,
     ) {
         (self.reader, self.writer)
     }
