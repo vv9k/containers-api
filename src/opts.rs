@@ -257,15 +257,14 @@ macro_rules! impl_url_serialize {
             impl [< $name  Opts >] {
                 /// Serialize options as a URL query String. Returns None if no options are defined.
                 pub fn serialize(&self) -> Option<String> {
-                    let params = $crate::url::encoded_pairs(&self.params);
-                    let vec_params = $crate::url::encoded_vec_pairs(&self.vec_params);
+                    let mut serialized = $crate::url::encoded_pairs(&self.params);
+                    let vec_p = $crate::url::encoded_vec_pairs(&self.vec_params);
 
-                    let mut serialized = format!("{params}");
-                    if !vec_params.is_empty() {
+                    if !vec_p.is_empty() {
                         if !serialized.is_empty() {
                             serialized.push('&');
                         }
-                        serialized.push_str(&vec_params);
+                        serialized.push_str(&vec_p);
                     }
 
                     if serialized.is_empty() {
