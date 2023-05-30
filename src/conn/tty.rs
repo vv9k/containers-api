@@ -128,7 +128,9 @@ impl Multiplexer {
     where
         Con: AsyncRead + AsyncWrite + Send + 'static,
         F: FnMut(ReadHalf<Con>) -> Fut + Send + 'static,
-        Fut: futures_util::Future<Output = Option<(Result<TtyChunk>, ReadHalf<Con>)>> + Send + 'static,
+        Fut: futures_util::Future<Output = Option<(Result<TtyChunk>, ReadHalf<Con>)>>
+            + Send
+            + 'static,
     {
         let (reader, writer) = tcp_connection.split();
 
@@ -166,12 +168,7 @@ impl AsyncWrite for Multiplexer {
 
 impl Multiplexer {
     /// Split the `Multiplexer` into the component `Stream` and `AsyncWrite` parts
-    pub fn split(
-        self,
-    ) -> (
-        impl Stream<Item = Result<TtyChunk>>,
-        impl AsyncWrite + Send,
-    ) {
+    pub fn split(self) -> (impl Stream<Item = Result<TtyChunk>>, impl AsyncWrite + Send) {
         (self.reader, self.writer)
     }
 }
