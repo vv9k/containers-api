@@ -21,12 +21,13 @@ pub enum TtyChunk {
     StdIn(Vec<u8>),
     StdOut(Vec<u8>),
     StdErr(Vec<u8>),
+    Extra(Vec<u8>)
 }
 
 impl From<TtyChunk> for Vec<u8> {
     fn from(tty_chunk: TtyChunk) -> Self {
         match tty_chunk {
-            TtyChunk::StdIn(bytes) | TtyChunk::StdOut(bytes) | TtyChunk::StdErr(bytes) => bytes,
+            TtyChunk::StdIn(bytes) | TtyChunk::StdOut(bytes) | TtyChunk::StdErr(bytes) | TtyChunk::Extra(bytes) => bytes,
         }
     }
 }
@@ -34,7 +35,7 @@ impl From<TtyChunk> for Vec<u8> {
 impl AsRef<Vec<u8>> for TtyChunk {
     fn as_ref(&self) -> &Vec<u8> {
         match self {
-            TtyChunk::StdIn(bytes) | TtyChunk::StdOut(bytes) | TtyChunk::StdErr(bytes) => bytes,
+            TtyChunk::StdIn(bytes) | TtyChunk::StdOut(bytes) | TtyChunk::StdErr(bytes) | TtyChunk::Extra(bytes)=> bytes,
         }
     }
 }
@@ -49,7 +50,7 @@ impl std::ops::Deref for TtyChunk {
 impl std::ops::DerefMut for TtyChunk {
     fn deref_mut(&mut self) -> &mut Vec<u8> {
         match self {
-            TtyChunk::StdIn(bytes) | TtyChunk::StdOut(bytes) | TtyChunk::StdErr(bytes) => bytes,
+            TtyChunk::StdIn(bytes) | TtyChunk::StdOut(bytes) | TtyChunk::StdErr(bytes) | TtyChunk::Extra(bytes)=> bytes,
         }
     }
 }
@@ -79,6 +80,7 @@ where
         0 => TtyChunk::StdIn(data),
         1 => TtyChunk::StdOut(data),
         2 => TtyChunk::StdErr(data),
+        3 => TtyChunk::Extra(data),
         n => panic!("invalid stream number from podman daemon: '{n}'"),
     };
 
