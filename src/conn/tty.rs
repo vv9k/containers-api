@@ -20,7 +20,7 @@ use std::{
 pub enum TtyChunk {
     StdIn(Vec<u8>),
     StdOut(Vec<u8>),
-    StdErr(Vec<u8>),
+    StdErr(Vec<u8>)
 }
 
 impl From<TtyChunk> for Vec<u8> {
@@ -79,6 +79,7 @@ where
         0 => TtyChunk::StdIn(data),
         1 => TtyChunk::StdOut(data),
         2 => TtyChunk::StdErr(data),
+        3 => TtyChunk::StdOut(data),
         n => panic!("invalid stream number from podman daemon: '{n}'"),
     };
 
