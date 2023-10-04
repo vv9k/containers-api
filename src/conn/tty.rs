@@ -79,7 +79,7 @@ where
         0 => TtyChunk::StdIn(data),
         1 => TtyChunk::StdOut(data),
         2 => TtyChunk::StdErr(data),
-        3 => TtyChunk::StdErr(data),
+        3 => TtyChunk::StdOut(data),
         n => panic!("invalid stream number from podman daemon: '{n}'"),
     };
 
